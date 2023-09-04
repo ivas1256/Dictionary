@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+ <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <edmx:Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <!-- Diagram content (shape and connector positions) -->
+    <edmx:Diagrams>
+      <Diagram DiagramId="38ca04d0b30447eda04f6fdc5a4e9017" Name="Diagram1">
+        <EntityTypeShape EntityType="dataModel.Language" Width="1.5" PointX="7.625" PointY="4.875" IsExpanded="true" />
+        <EntityTypeShape EntityType="dataModel.WordRus" Width="1.5" PointX="0.5" PointY="1.5" IsExpanded="true" />
+        <EntityTypeShape EntityType="dataModel.WordTranslation" Width="1.5" PointX="3.375" PointY="4" IsExpanded="true" />
+        <AssociationConnector Association="dataModel.FK_word_translation_0_0" ManuallyRouted="false" />
+        <AssociationConnector Association="dataModel.FK_word_translation_0_01" />
+        <EntityTypeShape EntityType="dataModel.WordRelated" Width="1.5" PointX="6.625" PointY="1.375" />
+        <EntityTypeShape EntityType="dataModel.WordRusToRelated" Width="1.5" PointX="3.375" PointY="0.5" />
+        <AssociationConnector Association="dataModel.FK_word_related_0_0" />
+        <AssociationConnector Association="dataModel.FK_word_rus_to_related_0_0" />
+        <AssociationConnector Association="dataModel.FK_word_rus_to_related_1_0" />
+      </Diagram>
+    </edmx:Diagrams>
+  </edmx:Designer>
+</edmx:Edmx>

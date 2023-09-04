@@ -1,0 +1,3500 @@
+File: App.xaml.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Data;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+
+namespace Dictionary
+{
+    /// <summary>
+    /// Interaction logic for App.xaml
+    /// </summary>
+    public partial class App : Application
+    {
+    }
+}
+
+File: BaseDataModel.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+
+namespace Dictionary.Data.Model
+{
+    public abstract class BaseDataModel : IDataErrorInfo
+    {
+        public bool CanValidate { get; set; } = false;
+
+        public bool ClassValid(DependencyObject validateControl)
+        {
+            CanValidate = true;
+            ICollection<string> errors = new List<string>();
+            var fields = GetType().GetProperties();
+            foreach(var field in fields)
+            {
+                object ObjectMetaData = GetType().GetCustomAttributes(typeof(MetadataTypeAttribute), true).FirstOrDefault();
+                MetadataTypeAttribute MetaData = ObjectMetaData as MetadataTypeAttribute;
+                if (MetaData == null)
+                    throw new NullReferenceException("Metadata null");
+                Type metadataClassType = MetaData.MetadataClassType;
+
+                var check = metadataClassType.GetProperties().Where(x => x.Name.Equals(field.Name));
+                if (check == null || check.Count() == 0)
+                    continue;
+                var err = this[field.Name];
+                if (!string.IsNullOrEmpty(err))
+                    errors.Add(err);
+            }
+
+            if (errors.Count() == 0)
+            {
+                CanValidate = false;
+                return true;
+            }
+
+            foreach (Control cb in FindLogicalChildren<Control>(validateControl))
+            {
+                if (cb is TextBox)
+                    cb.GetBindingExpression(TextBox.TextProperty)?.UpdateTarget();
+                if (cb is ComboBox)
+                    cb.GetBindingExpression(ComboBox.SelectedValueProperty)?.UpdateTarget();
+                if (cb is DatePicker)
+                    cb.GetBindingExpression(DatePicker.SelectedDateProperty)?.UpdateTarget();
+            }
+            CanValidate = false;
+            return false;
+        }
+
+        public string Error
+        {
+            get { throw new NotImplementedException(); }
+        }
+
+        public string this[string columnName]
+        {
+            get
+            {
+                if (!CanValidate)
+                    return null;
+
+                object ObjectMetaData = GetType().GetCustomAttributes(typeof(MetadataTypeAttribute), true).FirstOrDefault();
+                MetadataTypeAttribute MetaData = ObjectMetaData as MetadataTypeAttribute;
+                if (MetaData == null)
+                    throw new NullReferenceException("Metadata null");
+                Type metadataClassType = MetaData.MetadataClassType;
+
+                var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+                if (Validator.TryValidateProperty(
+                        GetType().GetProperty(columnName).GetValue(this, new object[0])
+                        , new ValidationContext(Activator.CreateInstance(metadataClassType), null, null)
+                        {
+                            MemberName = columnName
+                        }
+                        , validationResults))
+                    return null;
+
+                return validationResults.First().ErrorMessage;
+            }
+        }
+
+
+        public static IEnumerable<T> FindLogicalChildren<T>(DependencyObject depObj) where T : DependencyObject
+        {
+            if (depObj != null)
+            {
+                foreach (object rawChild in LogicalTreeHelper.GetChildren(depObj))
+                {
+                    if (rawChild is DependencyObject)
+                    {
+                        DependencyObject child = (DependencyObject)rawChild;
+                        if (child is T)
+                        {
+                            yield return (T)child;
+                        }
+
+                        foreach (T childOfChild in FindLogicalChildren<T>(child))
+                        {
+                            yield return childOfChild;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+File: IRepository.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Dictionary.Data.Repository
+{
+    interface IRepository<TEntity> where TEntity : class
+    {
+        TEntity Get(int id);
+        IEnumerable<TEntity> GetAll();
+        IEnumerable<TEntity> Find(Expression<Func<TEntity, bool>> predicte);
+
+        int Count();
+
+        void Add(TEntity entity);
+        void AddRange(IEnumerable<TEntity> entities);
+
+        void Remove(TEntity entity);
+        void RemoveRange(IEnumerable<TEntity> entities);
+    }
+}
+
+File: IUnitOfProductsWork.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Dictionary.Data.Repository
+{
+    /// <summary>
+    /// it's IUnitOfWork as repository pattern tell's
+    /// </summary>
+    interface IUnitOfProductsWork : IDisposable
+    {
+        void Complete();
+    }
+}
+
+File: Language.cs
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated from a template.
+//
+//     Manual changes to this file may cause unexpected behavior in your application.
+//     Manual changes to this file will be overwritten if the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+namespace Dictionary.Data.Model
+{
+    using System;
+    using System.Collections.Generic;
+    
+    public partial class Language
+    {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2214:DoNotCallOverridableMethodsInConstructors")]
+        public Language()
+        {
+            this.WordTranslations = new HashSet<WordTranslation>();
+        }
+    
+        public int Id { get; set; }
+        public string Name { get; set; }
+    
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
+        public virtual ICollection<WordTranslation> WordTranslations { get; set; }
+    }
+}
+
+File: Language_Repository.cs
+
+
+using Dictionary.Data.Model;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Data.Entity;
+
+namespace Dictionary.Data.Repository
+{
+    class Language_Repository : Repository<Language>
+    {
+        public Language_Repository(WordsContext dbContext) : base(dbContext)
+        {
+        }
+    }
+}
+
+File: MainWindow.xaml.cs
+
+
+using Dictionary.Data.Model;
+using Dictionary.Data.Repository;
+using Dictionary.Windows;
+using Dictionary.Windows.ViewModel;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Data.SQLite;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+
+namespace Dictionary
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+
+        Logger logger = LogManager.GetCurrentClassLogger();
+        WordsDB wordsContext;
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                wordsContext = new WordsDB(new Data.Model.WordsContext());
+                DataContext = new WordsViewModel(wordsContext);
+                cb_language.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.Error(ex, "Не удалось подключиться к базе данных");
+                logger.Error(ex);
+            }
+        }
+
+        private void Window_Activated(object sender, EventArgs e)
+        {
+            try
+            {
+                if (wordsContext == null)
+                    return;
+
+                DataContext = new WordsViewModel(wordsContext);
+                cb_language_SelectionChanged(this, null);
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.Error(ex, "Не удалось обновить список слов");
+                logger.Error(ex);
+            }
+        }
+
+        private void btn_addWord_Click(object sender, RoutedEventArgs e)
+        {
+            var w = new WordEditorWindow(EditAction.Add);
+            w.context = wordsContext;
+            w.ShowDialog();
+        }
+
+        private void btn_edit_Click(object sender, RoutedEventArgs e)
+        {
+            var word = lb_words.SelectedItem as WordRus;
+            if (word == null)
+                return;
+
+            var w = new WordEditorWindow(EditAction.Update, word.Id);
+            w.context = wordsContext;
+            w.ShowDialog();
+        }
+
+        private void btn_delete_Click(object sender, RoutedEventArgs e)
+        {
+            var word = lb_words.SelectedItem as WordRus;
+            if (word == null)
+                return;
+
+            try
+            {
+                if (!MessageProvider.Confirm($"Действительно удалить слово {word.Text}?"))
+                    return;
+
+                int id = word.Id;
+
+                wordsContext.RelatedWordNodes.RemoveRange(wordsContext.RelatedWordNodes.Find(x => x.WordRusId == id));
+                wordsContext.WordsRusToRelated.RemoveRange(wordsContext.WordsRusToRelated.Find(x => x.WordRusId == id));
+
+                wordsContext.WordTranslations.RemoveRange(wordsContext.WordTranslations.Find(x => x.WordId == id));
+                wordsContext.RusWords.Remove(word);
+                wordsContext.Complete();
+
+                Window_Activated(null, null);
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.Error(ex, "Не удалось удалить слово");
+                logger.Error(ex);
+            }
+        }
+
+        private void cb_language_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                (DataContext as WordsViewModel)?.Filter(cb_language.SelectedIndex + 1);
+                lb_words.GetBindingExpression(ListBox.ItemsSourceProperty).UpdateTarget();
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.UnknownError(ex);
+                logger.Error(ex);
+            }
+        }
+
+        private void btn_openCard_Click(object sender, RoutedEventArgs e)
+        {
+            var word = lb_words.SelectedItem as WordRus;
+            if (word == null)
+                return;
+
+            var w = new WordCardWindow(word.Id);
+            w.Show();
+        }
+
+        private void btn_search_Click(object sender, RoutedEventArgs e)
+        {
+            var query = tb_searchQuery.Text;
+            if (string.IsNullOrEmpty(query))
+                return;
+
+            try
+            {
+                var arr = query.Split(new string[] { "OR" }, StringSplitOptions.RemoveEmptyEntries);
+                var result = new List<WordRus>();
+
+                foreach(var a in arr)
+                   result.AddRange(wordsContext.RusWords.Find(x => x.Text.Contains(a.Trim())));
+
+                var w = new WordsListWindow(result, null);
+                w.Title = $"Поиск по запросу: {query}";
+                w.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.UnknownError(ex);
+                logger.Error(ex);
+            }
+        }
+
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            try
+            {
+                wordsContext?.Dispose();
+            }
+            catch
+            {
+            }
+        }
+
+        private void lb_words_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var word = lb_words.SelectedItem as WordRus;
+            if (word == null)
+                return;
+
+            var w = new WordCardWindow(word.Id);
+            w.Show();
+        }
+
+        private void lb_words_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Delete)
+                return;
+
+            btn_delete_Click(null, null);
+        }
+
+        private void tb_searchQuery_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter)
+                return;
+
+            btn_search_Click(null, null);
+        }
+    }
+}
+
+File: MergeFiles.exe
+
+
+MZ�       ��  �       @                                   �   � �	�!�L�!This program cannot be run in DOS mode.
+$       PE  L ��N\        � " 0  
+         �)       @    @                       �          `�                           �)  O    @  �                   `     L(                                                               H           .text   �	       
+                    `.rsrc   �   @                    @  @.reloc      `                    @  B                �)      H     !  <                                                      0 �      (  
+(  
+
+r  ps  
+s  
+ +@	� r  p(  
+(  
+o  
+ (  
+o  
+ (  
+o  
+  X	�i2��,o  
+ ��,o  
+ �*       Qq       e~     "(  
+ *   BSJB         v4.0.30319     l   H  #~  �    #Strings    �  ,   #US �     #GUID   �  @  #Blob         G 	    �3                                   �      ;| �| o J �   �   �  � [ t �  � ] a ] �  � � � �
+  ,
+  �  
+   
+  �
+  �
+  �
+  � 9
+  2 
+  &               �A   P     � T  !    �D     �	 D  D  D
+ ) D 1 D 9 D A D I D Q D Y D a D i D q D y D � �' � �+ � D1 � D: � 7 @ � �E � C  � M ' � �@ � Y  � D .  Z .  c .  � . # � . + � . 3 � . ; � . C � . K � . S � . [ � . c � . k � . s �  �               �             K         <Module> System.IO mscorlib FileMode IDisposable File GetFileName WriteLine get_NewLine Dispose GuidAttribute DebuggableAttribute ComVisibleAttribute AssemblyTitleAttribute AssemblyTrademarkAttribute TargetFrameworkAttribute AssemblyFileVersionAttribute AssemblyConfigurationAttribute AssemblyDescriptionAttribute CompilationRelaxationsAttribute AssemblyProductAttribute AssemblyCopyrightAttribute AssemblyCompanyAttribute RuntimeCompatibilityAttribute MergeFiles.exe System.Runtime.Versioning String Path FileStream Program System Main System.Reflection StreamWriter TextWriter .ctor System.Diagnostics System.Runtime.InteropServices System.Runtime.CompilerServices DebuggingModes MergeFiles GetFiles args FileAccess Format Object Environment ReadAllText get_CurrentDirectory    r e s u l t . t x t  F i l e :   { 0 }   _�$�>(J�����vg�       EI    UY ]  �z\V4�         TWrapNonExceptionThrows      
+MergeFiles       Copyright ©  2019  ) $d64b529d-c088-40e1-af32-20975995d858   1.0.0.0  M .NETFramework,Version=v4.6.1 TFrameworkDisplayName.NET Framework 4.6.1      ��N\         h(  h
+  RSDS:���~MAD�����n�   D:\Work Projects\_Своё\MergeFiles\MergeFiles\obj\Debug\MergeFiles.pdb                                                                                                                                                                                           �)          �)                          �)            _CorExeMain mscoree.dll     �%  @                                                          �   P  �                  8  �                   �                     h  �                   �  �@  ,          ,4   V S _ V E R S I O N _ I N F O     ���                 ?                         D    V a r F i l e I n f o     $    T r a n s l a t i o n       ��   S t r i n g F i l e I n f o   h   0 0 0 0 0 4 b 0      C o m m e n t s       "   C o m p a n y N a m e         >   F i l e D e s c r i p t i o n     M e r g e F i l e s     0   F i l e V e r s i o n     1 . 0 . 0 . 0   >   I n t e r n a l N a m e   M e r g e F i l e s . e x e     H   L e g a l C o p y r i g h t   C o p y r i g h t   �     2 0 1 9   *   L e g a l T r a d e m a r k s         F   O r i g i n a l F i l e n a m e   M e r g e F i l e s . e x e     6   P r o d u c t N a m e     M e r g e F i l e s     4   P r o d u c t V e r s i o n   1 . 0 . 0 . 0   8   A s s e m b l y   V e r s i o n   1 . 0 . 0 . 0   �C  �          ﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity version="1.0.0.0" name="MyApplication.app"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>                                                                                 �9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+File: MessageProvider.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+
+namespace Dictionary
+{
+    class MessageProvider
+    {
+        public static void UnknownError(Exception ex)
+        {
+            MessageBox.Show("Неизвестная ошибка: " + ex?.Message, "Ошибка",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        public static void Error(Exception ex, string message)
+        {
+            string fullMessage = ex.Message;
+            if (ex.Message.Contains("See the inner exception"))
+            {
+                fullMessage = "";
+                var currEx = ex;
+                while (currEx.InnerException != null)
+                {
+                    fullMessage += currEx.Message + " --> ";
+                    currEx = currEx.InnerException;
+                }
+                fullMessage += currEx.Message + " --> ";
+            }
+
+            MessageBox.Show($"{message}{Environment.NewLine}Ошибка: {fullMessage}.", "Ошибка",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        public static void Successfully(string message)
+        {
+            MessageBox.Show(message, "Информация",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        public static void Info(string message)
+        {
+            MessageBox.Show(message, "Информация",
+                MessageBoxButton.OK, MessageBoxImage.Exclamation);
+        }
+
+        public static void IncorrectData(string message)
+        {
+            MessageBox.Show(message, "Неверные данные",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        public static bool Confirm(string question)
+        {
+            return MessageBox.Show(question, "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        }
+    }
+}
+
+File: Repository.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.Data.Entity;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Dictionary.Data.Repository
+{
+    class Repository<TEntity> : IRepository<TEntity> where TEntity : class
+    {
+        protected readonly DbContext dbContext;
+
+        public Repository(DbContext dbContext)
+        {
+            this.dbContext = dbContext;
+        }
+
+        public void Add(TEntity entity)
+        {
+            dbContext.Set<TEntity>().Add(entity);
+        }
+
+        public void AddRange(IEnumerable<TEntity> entities)
+        {
+            dbContext.Set<TEntity>().AddRange(entities);
+        }
+
+        public int Count()
+        {
+            return dbContext.Set<TEntity>().Count();
+        }
+
+        public IEnumerable<TEntity> Find(Expression<Func<TEntity, bool>> predicte)
+        {
+            return dbContext.Set<TEntity>().Where(predicte);
+        }
+
+        public TEntity FindLast(Expression<Func<TEntity, bool>> predicte)
+        {
+            return dbContext.Set<TEntity>().Where(predicte).LastOrDefault();
+        }
+
+        public TEntity Get(int id)
+        {
+            return dbContext.Set<TEntity>().Find(id);
+        }
+
+        public IEnumerable<TEntity> GetAll()
+        {
+            return dbContext.Set<TEntity>().ToList();
+        }
+
+        public void Remove(TEntity entity)
+        {
+            dbContext.Set<TEntity>().Remove(entity);
+        }
+
+        public void RemoveRange(IEnumerable<TEntity> entities)
+        {
+            dbContext.Set<TEntity>().RemoveRange(entities);
+        }
+    }
+}
+
+File: WordCardWindow.xaml
+
+
+<Window x:Class="Dictionary.Windows.WordCardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Dictionary.Windows"
+        mc:Ignorable="d"
+        Title="Карточка слова" Height="350" Width="550" WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.25*"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <Label Content="На русском*:" Margin="5"/>
+        <Label Content="На английском:" Margin="5" Grid.Row="1"/>
+        <Label Content="На испанском:" Margin="5" Grid.Row="2"/>
+
+        <TextBlock Margin="5" Grid.Column="1"
+                 Text="{Binding Text}"/>
+        <TextBlock Margin="5" Grid.Row="1" Grid.Column="1" 
+                 Text="{Binding Eng}"/>
+        <TextBlock Margin="5" Grid.Row="2" Grid.Column="1"
+                 Text="{Binding Esp}"/>
+
+        <TextBlock Text="{Binding RelatedWords.Count, StringFormat=Смежные слова ({0}):}" Margin="5 5 5 0" Grid.Row="3" Grid.ColumnSpan="2"/>
+        <ListBox Grid.Row="4" Grid.ColumnSpan="2" Margin="5 0 5 5"
+                 ItemsSource="{Binding RelatedWords}" x:Name="lb_relatedWords"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Label Content="{Binding WordRus.Text}"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Редактировать слово" Click="btn_edit_Click"/>
+                    <MenuItem Header="Открыть карточку" Click="btn_openCard_Click"/>
+                </ContextMenu>
+            </ListBox.ContextMenu>
+        </ListBox>
+    </Grid>
+</Window>
+
+File: WordCardWindow.xaml.cs
+
+
+using Dictionary.Data.Model;
+using Dictionary.Data.Repository;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+
+namespace Dictionary.Windows
+{
+    /// <summary>
+    /// Interaction logic for WordCardWindow.xaml
+    /// </summary>
+    public partial class WordCardWindow : Window
+    {
+        int wordId;
+        Logger logger = LogManager.GetCurrentClassLogger();
+        public WordCardWindow(int wordId)
+        {
+            this.wordId = wordId;
+            InitializeComponent();
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var db = new WordsDB(new Data.Model.WordsContext());
+                DataContext = db.RusWords.GetForEditor(wordId);
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.Error(ex, "Не удалось загрузить карточку слова");
+                logger.Error(ex);
+            }
+        }
+
+        private void btn_openCard_Click(object sender, RoutedEventArgs e)
+        {
+            var word = lb_relatedWords.SelectedItem as WordRelated;
+            if (word == null)
+                return;
+
+            var w = new WordCardWindow(word.WordRusId);
+            w.Show();
+        }
+
+        private void btn_edit_Click(object sender, RoutedEventArgs e)
+        {
+            var word = lb_relatedWords.SelectedItem as WordRelated;
+            if (word == null)
+                return;
+
+            var w = new WordEditorWindow(EditAction.Update, word.WordRusId);
+            w.ShowDialog();
+        }
+    }
+}
+
+File: WordCurrLanguage_Converter.cs
+
+
+using Dictionary.Data.Model;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Data;
+
+namespace Dictionary.Windows
+{
+    class WordCurrLanguage_Converter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            int langId = (int)values[1];
+            langId++;
+
+            switch (langId)
+            {
+                case 1:
+                    return ((WordRus)values[0]).Text;
+                default:
+                    return ((WordRus)values[0]).Translations.Where(x => x.LanguageId == langId).FirstOrDefault()?.Text;
+            }
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            return null;
+        }
+    }
+}
+
+File: WordEditorWindow.xaml
+
+
+<Window x:Class="Dictionary.Windows.WordEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Dictionary.Windows"
+        xmlns:windows="clr-namespace:Dictionary.Windows"
+        mc:Ignorable="d"
+        Title="Добавить слово" Height="400" Width="600" WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.22*"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <Label Content="На русском*:" Margin="5"/>
+        <Label Content="На английском:" Margin="5" Grid.Row="1"/>
+        <Label Content="На испанском:" Margin="5" Grid.Row="2"/>
+
+        <TextBox Margin="5" Grid.Column="1"
+                 Text="{Binding Text, UpdateSourceTrigger=PropertyChanged, NotifyOnValidationError=True, ValidatesOnDataErrors=True}"/>
+        <TextBox Margin="5" Grid.Row="1" Grid.Column="1" 
+                 Text="{Binding Eng, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBox Margin="5" Grid.Row="2" Grid.Column="1"
+                 Text="{Binding Esp, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <Label Content="Смежные слова:" Margin="5 5 5 0" Grid.Row="3" Grid.ColumnSpan="2"/>
+        <Button Content="Добавить" Grid.Row="3" Grid.ColumnSpan="2"
+                HorizontalAlignment="Right" Margin="5"
+                Click="btn_addRelatedWord_Click"/>
+        <ListBox Grid.Row="4" Grid.ColumnSpan="2" Margin="5 0 5 5"
+                 ItemsSource="{Binding RelatedWords}" x:Name="lb_relatedWords"
+                 MouseDoubleClick="lb_relatedWords_MouseDoubleClick"
+                 KeyUp="lb_relatedWords_KeyUp">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="ListBoxItem">
+                    <TextBlock x:Name="label" Text="{Binding WordRus.Text}"/>
+                    <DataTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="TextDecorations" Value="Underline" TargetName="label"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                        </Trigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Удалить из смежных" Click="btn_deleteRelated_Click" InputGestureText="Delete"/>
+                    <MenuItem Header="Открыть карточку" Click="btn_openCard_Click"/>
+                </ContextMenu>
+            </ListBox.ContextMenu>
+        </ListBox>
+
+        <StackPanel Grid.Row="5" Grid.Column="1" HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Content="Добавить" x:Name="btn_ok" Width="70"
+                    Margin="5" Click="btn_ok_Click"/>
+            <Button Content="Отмена" x:Name="btn_cansel" Width="70" 
+                    Margin="5" Click="btn_cansel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
+
+File: WordEditorWindow.xaml.cs
+
+
+using Dictionary.Data.Model;
+using Dictionary.Data.Repository;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Data.SQLite;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+
+namespace Dictionary.Windows
+{
+    public enum EditAction { Add, Update };
+    /// <summary>
+    /// Interaction logic for WordEditorWindow.xaml
+    /// </summary>
+    public partial class WordEditorWindow : Window
+    {
+        int updatedId;
+        EditAction editAction;
+
+        Logger logger = LogManager.GetCurrentClassLogger();
+        public WordEditorWindow(EditAction editAction, int updatedId = -1)
+        {
+            this.updatedId = updatedId;
+            this.editAction = editAction;
+            InitializeComponent();
+        }
+
+        internal WordsDB context;
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (context == null)
+                context = new WordsDB(new WordsContext());
+            switch (editAction)
+            {
+                case EditAction.Add:
+                    DataContext = new WordRus();
+                    break;
+                case EditAction.Update:
+                    Title = "Редактирование слова";
+                    btn_ok.Content = "Изменить";
+                    DataContext = context.RusWords.GetForEditor(updatedId);
+                    break;
+            }
+        }
+
+        private void btn_addRelatedWord_Click(object sender, RoutedEventArgs e)
+        {
+            var word = DataContext as WordRus;
+            if (word == null)
+                return;
+
+            var hiddenIds = new List<int> { word.Id };
+            hiddenIds.AddRange(word.RelatedWords.Select(x => x.WordRusId));
+
+            var w = new WordsListWindow(null, hiddenIds);
+            w.Title = $"Выбрать смежное слово для {word.Text}";
+            w.ShowDialog();
+
+            try
+            {
+                if (w.SelectedWord != null)
+                {
+                    var targetWord = context.RusWords.Get(w.SelectedWord.Id);
+                    word.WordRusToRelated.Add(new WordRusToRelated()
+                    {
+                        RelatedWord = new WordRelated()
+                        {
+                            WordRus = targetWord
+                        }
+                    });
+
+                    targetWord.WordRusToRelated.Add(new WordRusToRelated()
+                    {
+                        RelatedWord = new WordRelated()
+                        {
+                            WordRus = word
+                        }
+                    });
+
+                    word.PropChanged("RelatedWords");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.UnknownError(ex);
+                logger.Error(ex);
+            }
+        }
+
+        private void btn_ok_Click(object sender, RoutedEventArgs e)
+        {
+            var word = DataContext as WordRus;
+            if (word == null)
+                return;
+
+            if (!word.IsValid(this))
+                return;
+
+            try
+            {
+                switch (editAction)
+                {
+                    case EditAction.Add:
+                        context.RusWords.Add(word);
+                        context.Complete();
+                        break;
+                    case EditAction.Update:
+                        context.Complete();
+                        break;
+                }
+
+                Close();
+            }
+            catch (Exception ex)
+            {
+                //todo entityvalidatein erros
+                MessageProvider.Error(ex, "Не удалось сохранить запись");
+                logger.Error(ex);
+            }
+        }
+
+        private void btn_deleteRelated_Click(object sender, RoutedEventArgs e)
+        {
+            var word = DataContext as WordRus;
+            if (word == null)
+                return;
+
+            var related = lb_relatedWords.SelectedItem as WordRelated;
+            if (related == null)
+                return;
+
+            try
+            {
+                if (!MessageProvider.Confirm($"Действительно удалить слово {related.WordRus.Text} из смежных?"))
+                    return;
+
+                var toDelete = context.WordsRusToRelated
+                    .Find(x => x.RelatedWordId == related.WordRusId || x.RelatedWordId == word.Id);
+                context.WordsRusToRelated.RemoveRange(toDelete);
+
+                var toDelete2 = context.RelatedWordNodes
+                    .Find(x => x.WordRusId == related.WordRusId || x.WordRusId == word.Id);
+                context.RelatedWordNodes.RemoveRange(toDelete2);
+
+                context.Complete();
+                word.PropChanged("RelatedWords");
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.Error(ex, "Не удалось удалить слово");
+                logger.Error(ex);
+            }
+        }
+
+        private void btn_cansel_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void btn_openCard_Click(object sender, RoutedEventArgs e)
+        {
+            var related = lb_relatedWords.SelectedItem as WordRelated;
+            if (related == null)
+                return;
+
+            var w = new WordCardWindow(related.WordRusId);
+            w.Show();
+        }
+
+        private void lb_relatedWords_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            btn_openCard_Click(null, null);
+        }
+
+        private void lb_relatedWords_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Delete)
+                return;
+
+            btn_deleteRelated_Click(null, null);
+        }
+    }
+}
+
+File: WordRelated.cs
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated from a template.
+//
+//     Manual changes to this file may cause unexpected behavior in your application.
+//     Manual changes to this file will be overwritten if the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+namespace Dictionary.Data.Model
+{
+    using System;
+    using System.Collections.Generic;
+    
+    public partial class WordRelated
+    {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2214:DoNotCallOverridableMethodsInConstructors")]
+        public WordRelated()
+        {
+            this.WordRusToRelated = new HashSet<WordRusToRelated>();
+        }
+    
+        public int Id { get; set; }
+        public int WordRusId { get; set; }
+    
+        public virtual WordRus WordRus { get; set; }
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
+        public virtual ICollection<WordRusToRelated> WordRusToRelated { get; set; }
+    }
+}
+
+File: WordRelated_Repository.cs
+
+
+using Dictionary.Data.Model;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Data.Entity;
+
+namespace Dictionary.Data.Repository
+{
+    class WordRelated_Repository : Repository<WordRelated>
+    {
+        public WordRelated_Repository(WordsContext dbContext) : base(dbContext)
+        {
+        }
+    }
+}
+
+File: WordRus.cs
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated from a template.
+//
+//     Manual changes to this file may cause unexpected behavior in your application.
+//     Manual changes to this file will be overwritten if the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+namespace Dictionary.Data.Model
+{
+    using System;
+    using System.Collections.Generic;
+    
+    public partial class WordRus
+    {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2214:DoNotCallOverridableMethodsInConstructors")]
+        public WordRus()
+        {
+            this.Translations = new HashSet<WordTranslation>();
+            this.RelatedWordNodes = new HashSet<WordRelated>();
+            this.WordRusToRelated = new HashSet<WordRusToRelated>();
+        }
+    
+        public int Id { get; set; }
+        public string Text { get; set; }
+    
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
+        public virtual ICollection<WordTranslation> Translations { get; set; }
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
+        public virtual ICollection<WordRelated> RelatedWordNodes { get; set; }
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
+        public virtual ICollection<WordRusToRelated> WordRusToRelated { get; set; }
+    }
+}
+
+File: WordRusMetadata.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+
+namespace Dictionary.Data.Model
+{
+    [MetadataType(typeof(WordRusMetadata))]
+    public partial class WordRus : BaseDataModel, INotifyPropertyChanged
+    {
+        public string CurrWordText { get; set; }
+
+        public string Eng
+        {
+            get
+            {
+                var check = Translations.Where(x => x.LanguageId == 2).FirstOrDefault();
+                if (check == null)
+                {
+                    var engObj = new WordTranslation() { LanguageId = 2 };
+                    Translations.Add(engObj);
+                    return engObj.Text;
+                }
+                else
+                    return check.Text;
+            }
+            set
+            {
+                var check = Translations.Where(x => x.LanguageId == 2).FirstOrDefault();
+                check.Text = value;
+
+                PropChanged("Eng");
+            }
+        }
+        public string Esp
+        {
+            get
+            {
+                var check = Translations.Where(x => x.LanguageId == 3).FirstOrDefault();
+                if (check == null)
+                {
+                    var espObj = new WordTranslation() { LanguageId = 3 };
+                    Translations.Add(espObj);
+                    return espObj.Text;
+                }
+                else
+                    return check.Text;
+            }
+            set
+            {
+                var check = Translations.Where(x => x.LanguageId == 3).FirstOrDefault();
+                check.Text = value;
+
+                PropChanged("Esp");
+            }
+        }
+
+        public List<WordRelated> RelatedWords
+        {
+            get
+            {
+                return WordRusToRelated.Select(x => x.RelatedWord).ToList();
+            }
+        }
+
+        public bool IsValid(DependencyObject validateControl)
+        {
+            var result = ClassValid(validateControl);
+            return result;
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        public void PropChanged(string name)
+        {
+            if (PropertyChanged != null)
+                PropertyChanged(this, new PropertyChangedEventArgs(name));
+        }
+    }
+
+    internal sealed class WordRusMetadata
+    {
+        [Required(AllowEmptyStrings = false)]
+        [Display(Name = "Оригинал на русском")]
+        public string Text { get; set; }
+    }
+}
+
+File: WordRusToRelated.cs
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated from a template.
+//
+//     Manual changes to this file may cause unexpected behavior in your application.
+//     Manual changes to this file will be overwritten if the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+namespace Dictionary.Data.Model
+{
+    using System;
+    using System.Collections.Generic;
+    
+    public partial class WordRusToRelated
+    {
+        public int Id { get; set; }
+        public int WordRusId { get; set; }
+        public int RelatedWordId { get; set; }
+    
+        public virtual WordRelated RelatedWord { get; set; }
+        public virtual WordRus WordRus { get; set; }
+    }
+}
+
+File: WordRusToRelated_Repository.cs
+
+
+using Dictionary.Data.Model;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Data.Entity;
+
+namespace Dictionary.Data.Repository
+{
+    class WordRusToRelated_Repository : Repository<WordRusToRelated>
+    {
+        public WordRusToRelated_Repository(WordsContext dbContext) : base(dbContext)
+        {
+        }
+    }
+}
+
+File: WordRus_Repository.cs
+
+
+using Dictionary.Data.Model;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Data.Entity;
+using System.Linq.Expressions;
+
+namespace Dictionary.Data.Repository
+{
+    class WordRus_Repository : Repository<WordRus>
+    {
+        public WordRus_Repository(WordsContext dbContext) : base(dbContext)
+        {
+        }
+
+        public List<WordRus> GetAllWithTranslations()
+        {
+            return ((WordsContext)dbContext).WordRus.Include("Translations").ToList();
+        }
+
+        public WordRus GetForEditor(int id)
+        {
+            return ((WordsContext)dbContext).WordRus
+                .Include("Translations")
+                //.Include("WordRusToRelated")
+                .Include("WordRusToRelated.RelatedWord.WordRus")
+                .Where(x => x.Id == id).FirstOrDefault();
+        }
+
+        public List<WordRus> FindWithTranslations(Expression<Func<WordRus, bool>> predicte)
+        {
+            return ((WordsContext)dbContext).WordRus.Include("Translations").Where(predicte).ToList();
+        }
+    }
+}
+
+File: WordsDB.cs
+
+
+using Dictionary.Data.Model;
+using System;
+using System.Collections.Generic;
+using System.Data.Entity;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Dictionary.Data.Repository
+{
+    class WordsDB : IUnitOfProductsWork
+    {
+        readonly WordsContext context;
+        public WordsDB(WordsContext _context)
+        {
+            context = _context;
+
+            RusWords = new WordRus_Repository(context);
+            WordTranslations = new WordTranslation_Repository(context);
+            RelatedWordNodes = new WordRelated_Repository(context);
+            Languages = new Language_Repository(context);
+            WordsRusToRelated = new WordRusToRelated_Repository(context);
+        }
+
+        public WordRus_Repository RusWords { get; private set; }
+        public WordTranslation_Repository WordTranslations { get; private set; }
+        public WordRelated_Repository RelatedWordNodes { get; private set; }
+        public Language_Repository Languages { get; private set; }
+        public WordRusToRelated_Repository WordsRusToRelated { get; private set; }
+
+        public Database Database
+        {
+            get
+            {
+                return context.Database;
+            }
+        }
+
+        public void Sql(string sql, params object[] args)
+        {
+            context.Database.ExecuteSqlCommand(sql, args);
+        }
+
+        public void Dispose()
+        {
+            context.Dispose();
+        }
+
+        public void Complete()
+        {
+            context.SaveChanges();
+        }
+    }
+}
+
+File: WordsListWindow.xaml
+
+
+<Window x:Class="Dictionary.Windows.WordsListWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Dictionary.Windows"
+        mc:Ignorable="d"
+        Title="WordsListWindow" Height="500" Width="400" WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+
+        <Label Content="Выберите слово:"/>
+        
+        <ListView x:Name="lb_words" Grid.Row="1" Margin="5"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  MouseDoubleClick="lb_words_MouseDoubleClick">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Text}"/>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+            <ListView.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Выбрать" Click="btn_select_Click" x:Name="btn_select"/>
+                    <MenuItem Header="Редактировать" Click="btn_edit_Click" x:Name="btn_edit"/>
+                    <MenuItem Header="Открыть карточку" Click="btn_openCard_Click"/>
+                </ContextMenu>
+            </ListView.ContextMenu>
+        </ListView>
+    </Grid>
+</Window>
+
+File: WordsListWindow.xaml.cs
+
+
+using Dictionary.Data.Model;
+using Dictionary.Data.Repository;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+
+namespace Dictionary.Windows
+{
+    /// <summary>
+    /// Interaction logic for WordsListWindow.xaml
+    /// </summary>
+    public partial class WordsListWindow : Window
+    {
+        public WordRus SelectedWord { get; set; }
+
+        Logger logger = LogManager.GetCurrentClassLogger();
+        List<WordRus> wordsToShow;
+        List<int> wordIdsToHide;
+        public WordsListWindow(List<WordRus> wordsToShow, List<int> wordIdsToHide)
+        {
+            this.wordsToShow = wordsToShow;
+            this.wordIdsToHide = wordIdsToHide;
+            InitializeComponent();
+        }
+
+        WordsDB db;
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (wordsToShow == null)
+                {
+                    db = new WordsDB(new WordsContext());
+                    lb_words.ItemsSource = db.RusWords.GetAll().Where(x => !wordIdsToHide.Contains(x.Id)).ToList();
+                    btn_edit.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    lb_words.ItemsSource = wordsToShow;
+                    btn_select.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageProvider.Error(ex, "Не удалось загрузить список");
+                logger.Error(ex);
+            }
+        }
+
+        private void lb_words_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var word = lb_words.SelectedItem as WordRus;
+            if (word == null)
+                return;
+
+            if (wordsToShow == null)
+            {                
+                db.Dispose();
+
+                SelectedWord = word;
+                Close();
+            }
+            else
+            {
+                var w = new WordCardWindow(word.Id);
+                w.Show();
+            }
+        }
+
+        private void btn_select_Click(object sender, RoutedEventArgs e)
+        {
+            lb_words_MouseDoubleClick(null, null);
+        }
+
+        private void btn_edit_Click(object sender, RoutedEventArgs e)
+        {
+            var word = lb_words.SelectedItem as WordRus;
+            if (word == null)
+                return;
+
+            var w = new WordEditorWindow(EditAction.Update, word.Id);            
+            w.ShowDialog();
+        }
+
+        private void btn_openCard_Click(object sender, RoutedEventArgs e)
+        {
+            var word = lb_words.SelectedItem as WordRus;
+            if (word == null)
+                return;
+
+            var w = new WordCardWindow(word.Id);
+            w.Show();
+        }
+    }
+}
+
+File: WordsModel.Context.cs
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated from a template.
+//
+//     Manual changes to this file may cause unexpected behavior in your application.
+//     Manual changes to this file will be overwritten if the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+namespace Dictionary.Data.Model
+{
+    using System;
+    using System.Data.Entity;
+    using System.Data.Entity.Infrastructure;
+    
+    public partial class WordsContext : DbContext
+    {
+        public WordsContext()
+            : base("name=WordsContext")
+        {
+            this.Configuration.LazyLoadingEnabled = false;
+        }
+    
+        protected override void OnModelCreating(DbModelBuilder modelBuilder)
+        {
+            throw new UnintentionalCodeFirstException();
+        }
+    
+        public virtual DbSet<Language> Language { get; set; }
+        public virtual DbSet<WordRus> WordRus { get; set; }
+        public virtual DbSet<WordTranslation> WordTranslation { get; set; }
+        public virtual DbSet<WordRelated> WordRelated { get; set; }
+        public virtual DbSet<WordRusToRelated> WordRusToRelated { get; set; }
+    }
+}
+
+File: WordsModel.Context.tt
+
+
+<#@ template language="C#" debug="false" hostspecific="true"#>
+<#@ include file="EF6.Utility.CS.ttinclude"#><#@
+ output extension=".cs"#><#
+
+const string inputFile = @"WordsModel.edmx";
+var textTransform = DynamicTextTransformation.Create(this);
+var code = new CodeGenerationTools(this);
+var ef = new MetadataTools(this);
+var typeMapper = new TypeMapper(code, ef, textTransform.Errors);
+var loader = new EdmMetadataLoader(textTransform.Host, textTransform.Errors);
+var itemCollection = loader.CreateEdmItemCollection(inputFile);
+var modelNamespace = loader.GetModelNamespace(inputFile);
+var codeStringGenerator = new CodeStringGenerator(code, typeMapper, ef);
+
+var container = itemCollection.OfType<EntityContainer>().FirstOrDefault();
+if (container == null)
+{
+    return string.Empty;
+}
+#>
+//------------------------------------------------------------------------------
+// <auto-generated>
+// <#=CodeGenerationTools.GetResourceString("Template_GeneratedCodeCommentLine1")#>
+//
+// <#=CodeGenerationTools.GetResourceString("Template_GeneratedCodeCommentLine2")#>
+// <#=CodeGenerationTools.GetResourceString("Template_GeneratedCodeCommentLine3")#>
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+<#
+
+var codeNamespace = code.VsNamespaceSuggestion();
+if (!String.IsNullOrEmpty(codeNamespace))
+{
+#>
+namespace <#=code.EscapeNamespace(codeNamespace)#>
+{
+<#
+    PushIndent("    ");
+}
+
+#>
+using System;
+using System.Data.Entity;
+using System.Data.Entity.Infrastructure;
+<#
+if (container.FunctionImports.Any())
+{
+#>
+using System.Data.Entity.Core.Objects;
+using System.Linq;
+<#
+}
+#>
+
+<#=Accessibility.ForType(container)#> partial class <#=code.Escape(container)#> : DbContext
+{
+    public <#=code.Escape(container)#>()
+        : base("name=<#=container.Name#>")
+    {
+<#
+if (!loader.IsLazyLoadingEnabled(container))
+{
+#>
+        this.Configuration.LazyLoadingEnabled = false;
+<#
+}
+
+foreach (var entitySet in container.BaseEntitySets.OfType<EntitySet>())
+{
+    // Note: the DbSet members are defined below such that the getter and
+    // setter always have the same accessibility as the DbSet definition
+    if (Accessibility.ForReadOnlyProperty(entitySet) != "public")
+    {
+#>
+        <#=codeStringGenerator.DbSetInitializer(entitySet)#>
+<#
+    }
+}
+#>
+    }
+
+    protected override void OnModelCreating(DbModelBuilder modelBuilder)
+    {
+        throw new UnintentionalCodeFirstException();
+    }
+
+<#
+    foreach (var entitySet in container.BaseEntitySets.OfType<EntitySet>())
+    {
+#>
+    <#=codeStringGenerator.DbSet(entitySet)#>
+<#
+    }
+
+    foreach (var edmFunction in container.FunctionImports)
+    {
+        WriteFunctionImport(typeMapper, codeStringGenerator, edmFunction, modelNamespace, includeMergeOption: false);
+    }
+#>
+}
+<#
+
+if (!String.IsNullOrEmpty(codeNamespace))
+{
+    PopIndent();
+#>
+}
+<#
+}
+#>
+<#+
+
+private void WriteFunctionImport(TypeMapper typeMapper, CodeStringGenerator codeStringGenerator, EdmFunction edmFunction, string modelNamespace, bool includeMergeOption)
+{
+    if (typeMapper.IsComposable(edmFunction))
+    {
+#>
+
+    [DbFunction("<#=edmFunction.NamespaceName#>", "<#=edmFunction.Name#>")]
+    <#=codeStringGenerator.ComposableFunctionMethod(edmFunction, modelNamespace)#>
+    {
+<#+
+        codeStringGenerator.WriteFunctionParameters(edmFunction, WriteFunctionParameter);
+#>
+        <#=codeStringGenerator.ComposableCreateQuery(edmFunction, modelNamespace)#>
+    }
+<#+
+    }
+    else
+    {
+#>
+
+    <#=codeStringGenerator.FunctionMethod(edmFunction, modelNamespace, includeMergeOption)#>
+    {
+<#+
+        codeStringGenerator.WriteFunctionParameters(edmFunction, WriteFunctionParameter);
+#>
+        <#=codeStringGenerator.ExecuteFunction(edmFunction, modelNamespace, includeMergeOption)#>
+    }
+<#+
+        if (typeMapper.GenerateMergeOptionFunction(edmFunction, includeMergeOption))
+        {
+            WriteFunctionImport(typeMapper, codeStringGenerator, edmFunction, modelNamespace, includeMergeOption: true);
+        }
+    }
+}
+
+public void WriteFunctionParameter(string name, string isNotNull, string notNullInit, string nullInit)
+{
+#>
+        var <#=name#> = <#=isNotNull#> ?
+            <#=notNullInit#> :
+            <#=nullInit#>;
+
+<#+
+}
+
+public const string TemplateId = "CSharp_DbContext_Context_EF6";
+
+public class CodeStringGenerator
+{
+    private readonly CodeGenerationTools _code;
+    private readonly TypeMapper _typeMapper;
+    private readonly MetadataTools _ef;
+
+    public CodeStringGenerator(CodeGenerationTools code, TypeMapper typeMapper, MetadataTools ef)
+    {
+        ArgumentNotNull(code, "code");
+        ArgumentNotNull(typeMapper, "typeMapper");
+        ArgumentNotNull(ef, "ef");
+
+        _code = code;
+        _typeMapper = typeMapper;
+        _ef = ef;
+    }
+
+    public string Property(EdmProperty edmProperty)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1} {2} {{ {3}get; {4}set; }}",
+            Accessibility.ForProperty(edmProperty),
+            _typeMapper.GetTypeName(edmProperty.TypeUsage),
+            _code.Escape(edmProperty),
+            _code.SpaceAfter(Accessibility.ForGetter(edmProperty)),
+            _code.SpaceAfter(Accessibility.ForSetter(edmProperty)));
+    }
+
+    public string NavigationProperty(NavigationProperty navProp)
+    {
+        var endType = _typeMapper.GetTypeName(navProp.ToEndMember.GetEntityType());
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1} {2} {{ {3}get; {4}set; }}",
+            AccessibilityAndVirtual(Accessibility.ForNavigationProperty(navProp)),
+            navProp.ToEndMember.RelationshipMultiplicity == RelationshipMultiplicity.Many ? ("ICollection<" + endType + ">") : endType,
+            _code.Escape(navProp),
+            _code.SpaceAfter(Accessibility.ForGetter(navProp)),
+            _code.SpaceAfter(Accessibility.ForSetter(navProp)));
+    }
+    
+    public string AccessibilityAndVirtual(string accessibility)
+    {
+        return accessibility + (accessibility != "private" ? " virtual" : "");
+    }
+    
+    public string EntityClassOpening(EntityType entity)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1}partial class {2}{3}",
+            Accessibility.ForType(entity),
+            _code.SpaceAfter(_code.AbstractOption(entity)),
+            _code.Escape(entity),
+            _code.StringBefore(" : ", _typeMapper.GetTypeName(entity.BaseType)));
+    }
+    
+    public string EnumOpening(SimpleType enumType)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} enum {1} : {2}",
+            Accessibility.ForType(enumType),
+            _code.Escape(enumType),
+            _code.Escape(_typeMapper.UnderlyingClrType(enumType)));
+        }
+    
+    public void WriteFunctionParameters(EdmFunction edmFunction, Action<string, string, string, string> writeParameter)
+    {
+        var parameters = FunctionImportParameter.Create(edmFunction.Parameters, _code, _ef);
+        foreach (var parameter in parameters.Where(p => p.NeedsLocalVariable))
+        {
+            var isNotNull = parameter.IsNullableOfT ? parameter.FunctionParameterName + ".HasValue" : parameter.FunctionParameterName + " != null";
+            var notNullInit = "new ObjectParameter(\"" + parameter.EsqlParameterName + "\", " + parameter.FunctionParameterName + ")";
+            var nullInit = "new ObjectParameter(\"" + parameter.EsqlParameterName + "\", typeof(" + TypeMapper.FixNamespaces(parameter.RawClrTypeName) + "))";
+            writeParameter(parameter.LocalVariableName, isNotNull, notNullInit, nullInit);
+        }
+    }
+    
+    public string ComposableFunctionMethod(EdmFunction edmFunction, string modelNamespace)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} IQueryable<{1}> {2}({3})",
+            AccessibilityAndVirtual(Accessibility.ForMethod(edmFunction)),
+            _typeMapper.GetTypeName(_typeMapper.GetReturnType(edmFunction), modelNamespace),
+            _code.Escape(edmFunction),
+            string.Join(", ", parameters.Select(p => TypeMapper.FixNamespaces(p.FunctionParameterType) + " " + p.FunctionParameterName).ToArray()));
+    }
+    
+    public string ComposableCreateQuery(EdmFunction edmFunction, string modelNamespace)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "return ((IObjectContextAdapter)this).ObjectContext.CreateQuery<{0}>(\"[{1}].[{2}]({3})\"{4});",
+            _typeMapper.GetTypeName(_typeMapper.GetReturnType(edmFunction), modelNamespace),
+            edmFunction.NamespaceName,
+            edmFunction.Name,
+            string.Join(", ", parameters.Select(p => "@" + p.EsqlParameterName).ToArray()),
+            _code.StringBefore(", ", string.Join(", ", parameters.Select(p => p.ExecuteParameterName).ToArray())));
+    }
+    
+    public string FunctionMethod(EdmFunction edmFunction, string modelNamespace, bool includeMergeOption)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        var returnType = _typeMapper.GetReturnType(edmFunction);
+
+        var paramList = String.Join(", ", parameters.Select(p => TypeMapper.FixNamespaces(p.FunctionParameterType) + " " + p.FunctionParameterName).ToArray());
+        if (includeMergeOption)
+        {
+            paramList = _code.StringAfter(paramList, ", ") + "MergeOption mergeOption";
+        }
+
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1} {2}({3})",
+            AccessibilityAndVirtual(Accessibility.ForMethod(edmFunction)),
+            returnType == null ? "int" : "ObjectResult<" + _typeMapper.GetTypeName(returnType, modelNamespace) + ">",
+            _code.Escape(edmFunction),
+            paramList);
+    }
+    
+    public string ExecuteFunction(EdmFunction edmFunction, string modelNamespace, bool includeMergeOption)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        var returnType = _typeMapper.GetReturnType(edmFunction);
+
+        var callParams = _code.StringBefore(", ", String.Join(", ", parameters.Select(p => p.ExecuteParameterName).ToArray()));
+        if (includeMergeOption)
+        {
+            callParams = ", mergeOption" + callParams;
+        }
+        
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction{0}(\"{1}\"{2});",
+            returnType == null ? "" : "<" + _typeMapper.GetTypeName(returnType, modelNamespace) + ">",
+            edmFunction.Name,
+            callParams);
+    }
+    
+    public string DbSet(EntitySet entitySet)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} virtual DbSet<{1}> {2} {{ get; set; }}",
+            Accessibility.ForReadOnlyProperty(entitySet),
+            _typeMapper.GetTypeName(entitySet.ElementType),
+            _code.Escape(entitySet));
+    }
+
+    public string DbSetInitializer(EntitySet entitySet)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} = Set<{1}>();",
+            _code.Escape(entitySet),
+            _typeMapper.GetTypeName(entitySet.ElementType));
+    }
+
+    public string UsingDirectives(bool inHeader, bool includeCollections = true)
+    {
+        return inHeader == string.IsNullOrEmpty(_code.VsNamespaceSuggestion())
+            ? string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}using System;{1}" +
+                "{2}",
+                inHeader ? Environment.NewLine : "",
+                includeCollections ? (Environment.NewLine + "using System.Collections.Generic;") : "",
+                inHeader ? "" : Environment.NewLine)
+            : "";
+    }
+}
+
+public class TypeMapper
+{
+    private const string ExternalTypeNameAttributeName = @"http://schemas.microsoft.com/ado/2006/04/codegeneration:ExternalTypeName";
+
+    private readonly System.Collections.IList _errors;
+    private readonly CodeGenerationTools _code;
+    private readonly MetadataTools _ef;
+
+    public static string FixNamespaces(string typeName)
+    {
+        return typeName.Replace("System.Data.Spatial.", "System.Data.Entity.Spatial.");
+    }
+
+    public TypeMapper(CodeGenerationTools code, MetadataTools ef, System.Collections.IList errors)
+    {
+        ArgumentNotNull(code, "code");
+        ArgumentNotNull(ef, "ef");
+        ArgumentNotNull(errors, "errors");
+
+        _code = code;
+        _ef = ef;
+        _errors = errors;
+    }
+
+    public string GetTypeName(TypeUsage typeUsage)
+    {
+        return typeUsage == null ? null : GetTypeName(typeUsage.EdmType, _ef.IsNullable(typeUsage), modelNamespace: null);
+    }
+
+    public string GetTypeName(EdmType edmType)
+    {
+        return GetTypeName(edmType, isNullable: null, modelNamespace: null);
+    }
+
+    public string GetTypeName(TypeUsage typeUsage, string modelNamespace)
+    {
+        return typeUsage == null ? null : GetTypeName(typeUsage.EdmType, _ef.IsNullable(typeUsage), modelNamespace);
+    }
+
+    public string GetTypeName(EdmType edmType, string modelNamespace)
+    {
+        return GetTypeName(edmType, isNullable: null, modelNamespace: modelNamespace);
+    }
+
+    public string GetTypeName(EdmType edmType, bool? isNullable, string modelNamespace)
+    {
+        if (edmType == null)
+        {
+            return null;
+        }
+
+        var collectionType = edmType as CollectionType;
+        if (collectionType != null)
+        {
+            return String.Format(CultureInfo.InvariantCulture, "ICollection<{0}>", GetTypeName(collectionType.TypeUsage, modelNamespace));
+        }
+
+        var typeName = _code.Escape(edmType.MetadataProperties
+                                .Where(p => p.Name == ExternalTypeNameAttributeName)
+                                .Select(p => (string)p.Value)
+                                .FirstOrDefault())
+            ?? (modelNamespace != null && edmType.NamespaceName != modelNamespace ?
+                _code.CreateFullName(_code.EscapeNamespace(edmType.NamespaceName), _code.Escape(edmType)) :
+                _code.Escape(edmType));
+
+        if (edmType is StructuralType)
+        {
+            return typeName;
+        }
+
+        if (edmType is SimpleType)
+        {
+            var clrType = UnderlyingClrType(edmType);
+            if (!IsEnumType(edmType))
+            {
+                typeName = _code.Escape(clrType);
+            }
+
+            typeName = FixNamespaces(typeName);
+
+            return clrType.IsValueType && isNullable == true ?
+                String.Format(CultureInfo.InvariantCulture, "Nullable<{0}>", typeName) :
+                typeName;
+        }
+
+        throw new ArgumentException("edmType");
+    }
+    
+    public Type UnderlyingClrType(EdmType edmType)
+    {
+        ArgumentNotNull(edmType, "edmType");
+
+        var primitiveType = edmType as PrimitiveType;
+        if (primitiveType != null)
+        {
+            return primitiveType.ClrEquivalentType;
+        }
+
+        if (IsEnumType(edmType))
+        {
+            return GetEnumUnderlyingType(edmType).ClrEquivalentType;
+        }
+
+        return typeof(object);
+    }
+    
+    public object GetEnumMemberValue(MetadataItem enumMember)
+    {
+        ArgumentNotNull(enumMember, "enumMember");
+        
+        var valueProperty = enumMember.GetType().GetProperty("Value");
+        return valueProperty == null ? null : valueProperty.GetValue(enumMember, null);
+    }
+    
+    public string GetEnumMemberName(MetadataItem enumMember)
+    {
+        ArgumentNotNull(enumMember, "enumMember");
+        
+        var nameProperty = enumMember.GetType().GetProperty("Name");
+        return nameProperty == null ? null : (string)nameProperty.GetValue(enumMember, null);
+    }
+
+    public System.Collections.IEnumerable GetEnumMembers(EdmType enumType)
+    {
+        ArgumentNotNull(enumType, "enumType");
+
+        var membersProperty = enumType.GetType().GetProperty("Members");
+        return membersProperty != null 
+            ? (System.Collections.IEnumerable)membersProperty.GetValue(enumType, null)
+            : Enumerable.Empty<MetadataItem>();
+    }
+    
+    public bool EnumIsFlags(EdmType enumType)
+    {
+        ArgumentNotNull(enumType, "enumType");
+        
+        var isFlagsProperty = enumType.GetType().GetProperty("IsFlags");
+        return isFlagsProperty != null && (bool)isFlagsProperty.GetValue(enumType, null);
+    }
+
+    public bool IsEnumType(GlobalItem edmType)
+    {
+        ArgumentNotNull(edmType, "edmType");
+
+        return edmType.GetType().Name == "EnumType";
+    }
+
+    public PrimitiveType GetEnumUnderlyingType(EdmType enumType)
+    {
+        ArgumentNotNull(enumType, "enumType");
+
+        return (PrimitiveType)enumType.GetType().GetProperty("UnderlyingType").GetValue(enumType, null);
+    }
+
+    public string CreateLiteral(object value)
+    {
+        if (value == null || value.GetType() != typeof(TimeSpan))
+        {
+            return _code.CreateLiteral(value);
+        }
+
+        return string.Format(CultureInfo.InvariantCulture, "new TimeSpan({0})", ((TimeSpan)value).Ticks);
+    }
+    
+    public bool VerifyCaseInsensitiveTypeUniqueness(IEnumerable<string> types, string sourceFile)
+    {
+        ArgumentNotNull(types, "types");
+        ArgumentNotNull(sourceFile, "sourceFile");
+        
+        var hash = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+        if (types.Any(item => !hash.Add(item)))
+        {
+            _errors.Add(
+                new CompilerError(sourceFile, -1, -1, "6023",
+                    String.Format(CultureInfo.CurrentCulture, CodeGenerationTools.GetResourceString("Template_CaseInsensitiveTypeConflict"))));
+            return false;
+        }
+        return true;
+    }
+    
+    public IEnumerable<SimpleType> GetEnumItemsToGenerate(IEnumerable<GlobalItem> itemCollection)
+    {
+        return GetItemsToGenerate<SimpleType>(itemCollection)
+            .Where(e => IsEnumType(e));
+    }
+    
+    public IEnumerable<T> GetItemsToGenerate<T>(IEnumerable<GlobalItem> itemCollection) where T: EdmType
+    {
+        return itemCollection
+            .OfType<T>()
+            .Where(i => !i.MetadataProperties.Any(p => p.Name == ExternalTypeNameAttributeName))
+            .OrderBy(i => i.Name);
+    }
+
+    public IEnumerable<string> GetAllGlobalItems(IEnumerable<GlobalItem> itemCollection)
+    {
+        return itemCollection
+            .Where(i => i is EntityType || i is ComplexType || i is EntityContainer || IsEnumType(i))
+            .Select(g => GetGlobalItemName(g));
+    }
+
+    public string GetGlobalItemName(GlobalItem item)
+    {
+        if (item is EdmType)
+        {
+            return ((EdmType)item).Name;
+        }
+        else
+        {
+            return ((EntityContainer)item).Name;
+        }
+    }
+
+    public IEnumerable<EdmProperty> GetSimpleProperties(EntityType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type);
+    }
+    
+    public IEnumerable<EdmProperty> GetSimpleProperties(ComplexType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type);
+    }
+    
+    public IEnumerable<EdmProperty> GetComplexProperties(EntityType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is ComplexType && p.DeclaringType == type);
+    }
+    
+    public IEnumerable<EdmProperty> GetComplexProperties(ComplexType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is ComplexType && p.DeclaringType == type);
+    }
+
+    public IEnumerable<EdmProperty> GetPropertiesWithDefaultValues(EntityType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type && p.DefaultValue != null);
+    }
+    
+    public IEnumerable<EdmProperty> GetPropertiesWithDefaultValues(ComplexType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type && p.DefaultValue != null);
+    }
+
+    public IEnumerable<NavigationProperty> GetNavigationProperties(EntityType type)
+    {
+        return type.NavigationProperties.Where(np => np.DeclaringType == type);
+    }
+    
+    public IEnumerable<NavigationProperty> GetCollectionNavigationProperties(EntityType type)
+    {
+        return type.NavigationProperties.Where(np => np.DeclaringType == type && np.ToEndMember.RelationshipMultiplicity == RelationshipMultiplicity.Many);
+    }
+    
+    public FunctionParameter GetReturnParameter(EdmFunction edmFunction)
+    {
+        ArgumentNotNull(edmFunction, "edmFunction");
+
+        var returnParamsProperty = edmFunction.GetType().GetProperty("ReturnParameters");
+        return returnParamsProperty == null
+            ? edmFunction.ReturnParameter
+            : ((IEnumerable<FunctionParameter>)returnParamsProperty.GetValue(edmFunction, null)).FirstOrDefault();
+    }
+
+    public bool IsComposable(EdmFunction edmFunction)
+    {
+        ArgumentNotNull(edmFunction, "edmFunction");
+
+        var isComposableProperty = edmFunction.GetType().GetProperty("IsComposableAttribute");
+        return isComposableProperty != null && (bool)isComposableProperty.GetValue(edmFunction, null);
+    }
+
+    public IEnumerable<FunctionImportParameter> GetParameters(EdmFunction edmFunction)
+    {
+        return FunctionImportParameter.Create(edmFunction.Parameters, _code, _ef);
+    }
+
+    public TypeUsage GetReturnType(EdmFunction edmFunction)
+    {
+        var returnParam = GetReturnParameter(edmFunction);
+        return returnParam == null ? null : _ef.GetElementType(returnParam.TypeUsage);
+    }
+    
+    public bool GenerateMergeOptionFunction(EdmFunction edmFunction, bool includeMergeOption)
+    {
+        var returnType = GetReturnType(edmFunction);
+        return !includeMergeOption && returnType != null && returnType.EdmType.BuiltInTypeKind == BuiltInTypeKind.EntityType;
+    }
+}
+
+public static void ArgumentNotNull<T>(T arg, string name) where T : class
+{
+    if (arg == null)
+    {
+        throw new ArgumentNullException(name);
+    }
+}
+#>
+File: WordsModel.cs
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated from a template.
+//
+//     Manual changes to this file may cause unexpected behavior in your application.
+//     Manual changes to this file will be overwritten if the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+
+File: WordsModel.Designer.cs
+
+
+// T4 code generation is enabled for model 'D:\Work Projects\Dictionary\Dictionary\Data\Model\WordsModel.edmx'. 
+// To enable legacy code generation, change the value of the 'Code Generation Strategy' designer
+// property to 'Legacy ObjectContext'. This property is available in the Properties Window when the model
+// is open in the designer.
+
+// If no context and entity classes have been generated, it may be because you created an empty model but
+// have not yet chosen which version of Entity Framework to use. To generate a context class and entity
+// classes for your model, open the model in the designer, right-click on the designer surface, and
+// select 'Update Model from Database...', 'Generate Database from Model...', or 'Add Code Generation
+// Item...'.
+File: WordsModel.edmx
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+  <!-- EF Runtime content -->
+  <edmx:Runtime>
+    <!-- SSDL content -->
+    <edmx:StorageModels>
+    <Schema Namespace="dataModel.Store" Provider="System.Data.SQLite.EF6" ProviderManifestToken="data source=&quot;D:\Work Projects\Dictionary\Dictionary\bin\Debug\data.db&quot;" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
+        <EntityType Name="language">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="name" Type="varchar" MaxLength="2147483647" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_related">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="word_rus_id" Type="integer" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_rus">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="text" Type="varchar" MaxLength="2147483647" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_rus_to_related">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="word_rus_id" Type="integer" Nullable="false" />
+          <Property Name="related_word_id" Type="integer" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_translation">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="word_id" Type="integer" Nullable="false" />
+          <Property Name="text" Type="varchar" MaxLength="2147483647" />
+          <Property Name="language_id" Type="integer" Nullable="false" />
+        </EntityType>
+        <Association Name="FK_word_related_0_0">
+          <End Role="word_rus" Type="Self.word_rus" Multiplicity="1" />
+          <End Role="word_related" Type="Self.word_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_related">
+              <PropertyRef Name="word_rus_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_0_0">
+          <End Role="word_related" Type="Self.word_related" Multiplicity="1" />
+          <End Role="word_rus_to_related" Type="Self.word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_related">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="related_word_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_1_0">
+          <End Role="word_rus" Type="Self.word_rus" Multiplicity="1" />
+          <End Role="word_rus_to_related" Type="Self.word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="word_rus_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_translation_0_0">
+          <End Role="language" Type="Self.language" Multiplicity="1" />
+          <End Role="word_translation" Type="Self.word_translation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="language">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="language_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_translation_1_0">
+          <End Role="word_rus" Type="Self.word_rus" Multiplicity="1" />
+          <End Role="word_translation" Type="Self.word_translation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="word_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityContainer Name="dataModelStoreContainer">
+          <EntitySet Name="language" EntityType="Self.language" store:Type="Tables" />
+          <EntitySet Name="word_related" EntityType="Self.word_related" store:Type="Tables" />
+          <EntitySet Name="word_rus" EntityType="Self.word_rus" store:Type="Tables" />
+          <EntitySet Name="word_rus_to_related" EntityType="Self.word_rus_to_related" store:Type="Tables" />
+          <EntitySet Name="word_translation" EntityType="Self.word_translation" store:Type="Tables" />
+          <AssociationSet Name="FK_word_related_0_0" Association="Self.FK_word_related_0_0">
+            <End Role="word_rus" EntitySet="word_rus" />
+            <End Role="word_related" EntitySet="word_related" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_0_0" Association="Self.FK_word_rus_to_related_0_0">
+            <End Role="word_related" EntitySet="word_related" />
+            <End Role="word_rus_to_related" EntitySet="word_rus_to_related" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_1_0" Association="Self.FK_word_rus_to_related_1_0">
+            <End Role="word_rus" EntitySet="word_rus" />
+            <End Role="word_rus_to_related" EntitySet="word_rus_to_related" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_translation_0_0" Association="Self.FK_word_translation_0_0">
+            <End Role="language" EntitySet="language" />
+            <End Role="word_translation" EntitySet="word_translation" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_translation_1_0" Association="Self.FK_word_translation_1_0">
+            <End Role="word_rus" EntitySet="word_rus" />
+            <End Role="word_translation" EntitySet="word_translation" />
+          </AssociationSet>
+        </EntityContainer>
+      </Schema></edmx:StorageModels>
+    <!-- CSDL content -->
+    <edmx:ConceptualModels>
+      <Schema Namespace="dataModel" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+        <EntityType Name="Language">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Name" Type="String" MaxLength="2147483647" FixedLength="false" Unicode="false" Nullable="false" />
+          <NavigationProperty Name="WordTranslations" Relationship="dataModel.FK_word_translation_0_01" FromRole="language" ToRole="word_translation" />
+        </EntityType>
+        <EntityType Name="WordRus">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Text" Type="String" MaxLength="2147483647" FixedLength="false" Unicode="false" Nullable="false" />
+          <NavigationProperty Name="Translations" Relationship="Self.FK_word_translation_0_0" FromRole="word_rus" ToRole="word_translation" />
+          <NavigationProperty Name="RelatedWordNodes" Relationship="dataModel.FK_word_related_0_0" FromRole="WordRus" ToRole="word_related" />
+          <NavigationProperty Name="WordRusToRelated" Relationship="dataModel.FK_word_rus_to_related_1_0" FromRole="WordRus" ToRole="word_rus_to_related" />
+        </EntityType>
+        <EntityType Name="WordTranslation">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="WordId" Type="Int32" Nullable="false" />
+          <Property Name="Text" Type="String" MaxLength="2147483647" FixedLength="false" Unicode="false" Nullable="true" />
+          <Property Name="LanguageId" Type="Int32" Nullable="false" />
+          <NavigationProperty Name="WordRus" Relationship="Self.FK_word_translation_0_0" FromRole="word_translation" ToRole="word_rus" />
+          <NavigationProperty Name="Language" Relationship="dataModel.FK_word_translation_0_01" FromRole="word_translation" ToRole="language" />
+        </EntityType>
+        <Association Name="FK_word_translation_0_0">
+          <End Role="word_rus" Type="dataModel.WordRus" Multiplicity="1" />
+          <End Role="word_translation" Type="dataModel.WordTranslation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="WordId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityContainer Name="WordsContext" annotation:LazyLoadingEnabled="false">
+          <EntitySet Name="Language" EntityType="dataModel.Language" />
+          <EntitySet Name="WordRus" EntityType="dataModel.WordRus" />
+          <EntitySet Name="WordTranslation" EntityType="dataModel.WordTranslation" />
+          <AssociationSet Name="FK_word_translation_0_0" Association="Self.FK_word_translation_0_0">
+            <End Role="word_rus" EntitySet="WordRus" />
+            <End Role="word_translation" EntitySet="WordTranslation" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_translation_0_01" Association="dataModel.FK_word_translation_0_01">
+            <End Role="language" EntitySet="Language" />
+            <End Role="word_translation" EntitySet="WordTranslation" />
+          </AssociationSet>
+          <EntitySet Name="WordRelated" EntityType="dataModel.WordRelated" />
+          <EntitySet Name="WordRusToRelated" EntityType="dataModel.WordRusToRelated" />
+          <AssociationSet Name="FK_word_related_0_0" Association="dataModel.FK_word_related_0_0">
+            <End Role="WordRus" EntitySet="WordRus" />
+            <End Role="word_related" EntitySet="WordRelated" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_0_0" Association="dataModel.FK_word_rus_to_related_0_0">
+            <End Role="word_related" EntitySet="WordRelated" />
+            <End Role="word_rus_to_related" EntitySet="WordRusToRelated" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_1_0" Association="dataModel.FK_word_rus_to_related_1_0">
+            <End Role="WordRus" EntitySet="WordRus" />
+            <End Role="word_rus_to_related" EntitySet="WordRusToRelated" />
+          </AssociationSet>
+        </EntityContainer>
+        <Association Name="FK_word_translation_0_01">
+          <End Type="dataModel.Language" Role="language" Multiplicity="1" />
+          <End Type="dataModel.WordTranslation" Role="word_translation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="language">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="LanguageId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityType Name="WordRelated">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="WordRusId" Type="Int32" Nullable="false" />
+          <NavigationProperty Name="WordRus" Relationship="dataModel.FK_word_related_0_0" FromRole="word_related" ToRole="WordRus" />
+          <NavigationProperty Name="WordRusToRelated" Relationship="dataModel.FK_word_rus_to_related_0_0" FromRole="word_related" ToRole="word_rus_to_related" />
+        </EntityType>
+        <EntityType Name="WordRusToRelated">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="WordRusId" Type="Int32" Nullable="false" />
+          <Property Name="RelatedWordId" Type="Int32" Nullable="false" />
+          <NavigationProperty Name="RelatedWord" Relationship="dataModel.FK_word_rus_to_related_0_0" FromRole="word_rus_to_related" ToRole="word_related" />
+          <NavigationProperty Name="WordRus" Relationship="dataModel.FK_word_rus_to_related_1_0" FromRole="word_rus_to_related" ToRole="WordRus" />
+        </EntityType>
+        <Association Name="FK_word_related_0_0">
+          <End Type="dataModel.WordRus" Role="WordRus" Multiplicity="1" />
+          <End Type="dataModel.WordRelated" Role="word_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="WordRus">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_related">
+              <PropertyRef Name="WordRusId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_0_0">
+          <End Type="dataModel.WordRelated" Role="word_related" Multiplicity="1" />
+          <End Type="dataModel.WordRusToRelated" Role="word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_related">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="RelatedWordId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_1_0">
+          <End Type="dataModel.WordRus" Role="WordRus" Multiplicity="1" />
+          <End Type="dataModel.WordRusToRelated" Role="word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="WordRus">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="WordRusId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+      </Schema>
+    </edmx:ConceptualModels>
+    <!-- C-S mapping content -->
+    <edmx:Mappings>
+      <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
+        <EntityContainerMapping StorageEntityContainer="dataModelStoreContainer" CdmEntityContainer="WordsContext">
+          <EntitySetMapping Name="Language">
+            <EntityTypeMapping TypeName="dataModel.Language">
+              <MappingFragment StoreEntitySet="language">
+                <ScalarProperty Name="Id" ColumnName="id" />
+                <ScalarProperty Name="Name" ColumnName="name" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordRus">
+            <EntityTypeMapping TypeName="dataModel.WordRus">
+              <MappingFragment StoreEntitySet="word_rus">
+                <ScalarProperty Name="Id" ColumnName="id" />
+                <ScalarProperty Name="Text" ColumnName="text" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordTranslation">
+            <EntityTypeMapping TypeName="dataModel.WordTranslation">
+              <MappingFragment StoreEntitySet="word_translation">
+                <ScalarProperty Name="Id" ColumnName="id" />
+                <ScalarProperty Name="WordId" ColumnName="word_id" />
+                <ScalarProperty Name="Text" ColumnName="text" />
+                <ScalarProperty Name="LanguageId" ColumnName="language_id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordRelated">
+            <EntityTypeMapping TypeName="dataModel.WordRelated">
+              <MappingFragment StoreEntitySet="word_related">
+                <ScalarProperty Name="WordRusId" ColumnName="word_rus_id" />
+                <ScalarProperty Name="Id" ColumnName="id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordRusToRelated">
+            <EntityTypeMapping TypeName="dataModel.WordRusToRelated">
+              <MappingFragment StoreEntitySet="word_rus_to_related">
+                <ScalarProperty Name="RelatedWordId" ColumnName="related_word_id" />
+                <ScalarProperty Name="WordRusId" ColumnName="word_rus_id" />
+                <ScalarProperty Name="Id" ColumnName="id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+        </EntityContainerMapping>
+      </Mapping>
+    </edmx:Mappings>
+  </edmx:Runtime>
+  <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <Connection>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="MetadataArtifactProcessing" Value="EmbedInOutputAssembly" />
+      </DesignerInfoPropertySet>
+    </Connection>
+    <Options>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="ValidateOnBuild" Value="true" />
+        <DesignerProperty Name="EnablePluralization" Value="false" />
+        <DesignerProperty Name="IncludeForeignKeysInModel" Value="true" />
+        <DesignerProperty Name="UseLegacyProvider" Value="false" />
+        <DesignerProperty Name="CodeGenerationStrategy" Value="None" />
+      </DesignerInfoPropertySet>
+    </Options>
+    <!-- Diagram content (shape and connector positions) -->
+    <Diagrams></Diagrams>
+  </Designer>
+</edmx:Edmx>
+File: WordsModel.edmx.diagram
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+ <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <edmx:Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <!-- Diagram content (shape and connector positions) -->
+    <edmx:Diagrams>
+      <Diagram DiagramId="38ca04d0b30447eda04f6fdc5a4e9017" Name="Diagram1">
+        <EntityTypeShape EntityType="dataModel.Language" Width="1.5" PointX="7.625" PointY="4.875" IsExpanded="true" />
+        <EntityTypeShape EntityType="dataModel.WordRus" Width="1.5" PointX="0.5" PointY="1.5" IsExpanded="true" />
+        <EntityTypeShape EntityType="dataModel.WordTranslation" Width="1.5" PointX="3.375" PointY="4" IsExpanded="true" />
+        <AssociationConnector Association="dataModel.FK_word_translation_0_0" ManuallyRouted="false" />
+        <AssociationConnector Association="dataModel.FK_word_translation_0_01" />
+        <EntityTypeShape EntityType="dataModel.WordRelated" Width="1.5" PointX="6.625" PointY="1.375" />
+        <EntityTypeShape EntityType="dataModel.WordRusToRelated" Width="1.5" PointX="3.375" PointY="0.5" />
+        <AssociationConnector Association="dataModel.FK_word_related_0_0" />
+        <AssociationConnector Association="dataModel.FK_word_rus_to_related_0_0" />
+        <AssociationConnector Association="dataModel.FK_word_rus_to_related_1_0" />
+      </Diagram>
+    </edmx:Diagrams>
+  </edmx:Designer>
+</edmx:Edmx>
+File: WordsModel.tt
+
+
+<#@ template language="C#" debug="false" hostspecific="true"#>
+<#@ include file="EF6.Utility.CS.ttinclude"#><#@ 
+ output extension=".cs"#><#
+
+const string inputFile = @"WordsModel.edmx";
+var textTransform = DynamicTextTransformation.Create(this);
+var code = new CodeGenerationTools(this);
+var ef = new MetadataTools(this);
+var typeMapper = new TypeMapper(code, ef, textTransform.Errors);
+var	fileManager = EntityFrameworkTemplateFileManager.Create(this);
+var itemCollection = new EdmMetadataLoader(textTransform.Host, textTransform.Errors).CreateEdmItemCollection(inputFile);
+var codeStringGenerator = new CodeStringGenerator(code, typeMapper, ef);
+
+if (!typeMapper.VerifyCaseInsensitiveTypeUniqueness(typeMapper.GetAllGlobalItems(itemCollection), inputFile))
+{
+    return string.Empty;
+}
+
+WriteHeader(codeStringGenerator, fileManager);
+
+foreach (var entity in typeMapper.GetItemsToGenerate<EntityType>(itemCollection))
+{
+    fileManager.StartNewFile(entity.Name + ".cs");
+    BeginNamespace(code);
+#>
+<#=codeStringGenerator.UsingDirectives(inHeader: false)#>
+<#=codeStringGenerator.EntityClassOpening(entity)#>
+{
+<#
+    var propertiesWithDefaultValues = typeMapper.GetPropertiesWithDefaultValues(entity);
+    var collectionNavigationProperties = typeMapper.GetCollectionNavigationProperties(entity);
+    var complexProperties = typeMapper.GetComplexProperties(entity);
+
+    if (propertiesWithDefaultValues.Any() || collectionNavigationProperties.Any() || complexProperties.Any())
+    {
+#>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2214:DoNotCallOverridableMethodsInConstructors")]
+    public <#=code.Escape(entity)#>()
+    {
+<#
+        foreach (var edmProperty in propertiesWithDefaultValues)
+        {
+#>
+        this.<#=code.Escape(edmProperty)#> = <#=typeMapper.CreateLiteral(edmProperty.DefaultValue)#>;
+<#
+        }
+
+        foreach (var navigationProperty in collectionNavigationProperties)
+        {
+#>
+        this.<#=code.Escape(navigationProperty)#> = new HashSet<<#=typeMapper.GetTypeName(navigationProperty.ToEndMember.GetEntityType())#>>();
+<#
+        }
+
+        foreach (var complexProperty in complexProperties)
+        {
+#>
+        this.<#=code.Escape(complexProperty)#> = new <#=typeMapper.GetTypeName(complexProperty.TypeUsage)#>();
+<#
+        }
+#>
+    }
+
+<#
+    }
+
+    var simpleProperties = typeMapper.GetSimpleProperties(entity);
+    if (simpleProperties.Any())
+    {
+        foreach (var edmProperty in simpleProperties)
+        {
+#>
+    <#=codeStringGenerator.Property(edmProperty)#>
+<#
+        }
+    }
+
+    if (complexProperties.Any())
+    {
+#>
+
+<#
+        foreach(var complexProperty in complexProperties)
+        {
+#>
+    <#=codeStringGenerator.Property(complexProperty)#>
+<#
+        }
+    }
+
+    var navigationProperties = typeMapper.GetNavigationProperties(entity);
+    if (navigationProperties.Any())
+    {
+#>
+
+<#
+        foreach (var navigationProperty in navigationProperties)
+        {
+            if (navigationProperty.ToEndMember.RelationshipMultiplicity == RelationshipMultiplicity.Many)
+            {
+#>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly")]
+<#
+            }
+#>
+    <#=codeStringGenerator.NavigationProperty(navigationProperty)#>
+<#
+        }
+    }
+#>
+}
+<#
+    EndNamespace(code);
+}
+
+foreach (var complex in typeMapper.GetItemsToGenerate<ComplexType>(itemCollection))
+{
+    fileManager.StartNewFile(complex.Name + ".cs");
+    BeginNamespace(code);
+#>
+<#=codeStringGenerator.UsingDirectives(inHeader: false, includeCollections: false)#>
+<#=Accessibility.ForType(complex)#> partial class <#=code.Escape(complex)#>
+{
+<#
+    var complexProperties = typeMapper.GetComplexProperties(complex);
+    var propertiesWithDefaultValues = typeMapper.GetPropertiesWithDefaultValues(complex);
+
+    if (propertiesWithDefaultValues.Any() || complexProperties.Any())
+    {
+#>
+    public <#=code.Escape(complex)#>()
+    {
+<#
+        foreach (var edmProperty in propertiesWithDefaultValues)
+        {
+#>
+        this.<#=code.Escape(edmProperty)#> = <#=typeMapper.CreateLiteral(edmProperty.DefaultValue)#>;
+<#
+        }
+
+        foreach (var complexProperty in complexProperties)
+        {
+#>
+        this.<#=code.Escape(complexProperty)#> = new <#=typeMapper.GetTypeName(complexProperty.TypeUsage)#>();
+<#
+        }
+#>
+    }
+
+<#
+    }
+
+    var simpleProperties = typeMapper.GetSimpleProperties(complex);
+    if (simpleProperties.Any())
+    {
+        foreach(var edmProperty in simpleProperties)
+        {
+#>
+    <#=codeStringGenerator.Property(edmProperty)#>
+<#
+        }
+    }
+
+    if (complexProperties.Any())
+    {
+#>
+
+<#
+        foreach(var edmProperty in complexProperties)
+        {
+#>
+    <#=codeStringGenerator.Property(edmProperty)#>
+<#
+        }
+    }
+#>
+}
+<#
+    EndNamespace(code);
+}
+
+foreach (var enumType in typeMapper.GetEnumItemsToGenerate(itemCollection))
+{
+    fileManager.StartNewFile(enumType.Name + ".cs");
+    BeginNamespace(code);
+#>
+<#=codeStringGenerator.UsingDirectives(inHeader: false, includeCollections: false)#>
+<#
+    if (typeMapper.EnumIsFlags(enumType))
+    {
+#>
+[Flags]
+<#
+    }
+#>
+<#=codeStringGenerator.EnumOpening(enumType)#>
+{
+<#
+    var foundOne = false;
+    
+    foreach (MetadataItem member in typeMapper.GetEnumMembers(enumType))
+    {
+        foundOne = true;
+#>
+    <#=code.Escape(typeMapper.GetEnumMemberName(member))#> = <#=typeMapper.GetEnumMemberValue(member)#>,
+<#
+    }
+
+    if (foundOne)
+    {
+        this.GenerationEnvironment.Remove(this.GenerationEnvironment.Length - 3, 1);
+    }
+#>
+}
+<#
+    EndNamespace(code);
+}
+
+fileManager.Process();
+
+#>
+<#+
+
+public void WriteHeader(CodeStringGenerator codeStringGenerator, EntityFrameworkTemplateFileManager fileManager)
+{
+    fileManager.StartHeader();
+#>
+//------------------------------------------------------------------------------
+// <auto-generated>
+// <#=CodeGenerationTools.GetResourceString("Template_GeneratedCodeCommentLine1")#>
+//
+// <#=CodeGenerationTools.GetResourceString("Template_GeneratedCodeCommentLine2")#>
+// <#=CodeGenerationTools.GetResourceString("Template_GeneratedCodeCommentLine3")#>
+// </auto-generated>
+//------------------------------------------------------------------------------
+<#=codeStringGenerator.UsingDirectives(inHeader: true)#>
+<#+
+    fileManager.EndBlock();
+}
+
+public void BeginNamespace(CodeGenerationTools code)
+{
+    var codeNamespace = code.VsNamespaceSuggestion();
+    if (!String.IsNullOrEmpty(codeNamespace))
+    {
+#>
+namespace <#=code.EscapeNamespace(codeNamespace)#>
+{
+<#+
+        PushIndent("    ");
+    }
+}
+
+public void EndNamespace(CodeGenerationTools code)
+{
+    if (!String.IsNullOrEmpty(code.VsNamespaceSuggestion()))
+    {
+        PopIndent();
+#>
+}
+<#+
+    }
+}
+
+public const string TemplateId = "CSharp_DbContext_Types_EF6";
+
+public class CodeStringGenerator
+{
+    private readonly CodeGenerationTools _code;
+    private readonly TypeMapper _typeMapper;
+    private readonly MetadataTools _ef;
+
+    public CodeStringGenerator(CodeGenerationTools code, TypeMapper typeMapper, MetadataTools ef)
+    {
+        ArgumentNotNull(code, "code");
+        ArgumentNotNull(typeMapper, "typeMapper");
+        ArgumentNotNull(ef, "ef");
+
+        _code = code;
+        _typeMapper = typeMapper;
+        _ef = ef;
+    }
+
+    public string Property(EdmProperty edmProperty)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1} {2} {{ {3}get; {4}set; }}",
+            Accessibility.ForProperty(edmProperty),
+            _typeMapper.GetTypeName(edmProperty.TypeUsage),
+            _code.Escape(edmProperty),
+            _code.SpaceAfter(Accessibility.ForGetter(edmProperty)),
+            _code.SpaceAfter(Accessibility.ForSetter(edmProperty)));
+    }
+
+    public string NavigationProperty(NavigationProperty navProp)
+    {
+        var endType = _typeMapper.GetTypeName(navProp.ToEndMember.GetEntityType());
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1} {2} {{ {3}get; {4}set; }}",
+            AccessibilityAndVirtual(Accessibility.ForNavigationProperty(navProp)),
+            navProp.ToEndMember.RelationshipMultiplicity == RelationshipMultiplicity.Many ? ("ICollection<" + endType + ">") : endType,
+            _code.Escape(navProp),
+            _code.SpaceAfter(Accessibility.ForGetter(navProp)),
+            _code.SpaceAfter(Accessibility.ForSetter(navProp)));
+    }
+    
+    public string AccessibilityAndVirtual(string accessibility)
+    {
+        return accessibility + (accessibility != "private" ? " virtual" : "");
+    }
+    
+    public string EntityClassOpening(EntityType entity)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1}partial class {2}{3}",
+            Accessibility.ForType(entity),
+            _code.SpaceAfter(_code.AbstractOption(entity)),
+            _code.Escape(entity),
+            _code.StringBefore(" : ", _typeMapper.GetTypeName(entity.BaseType)));
+    }
+    
+    public string EnumOpening(SimpleType enumType)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} enum {1} : {2}",
+            Accessibility.ForType(enumType),
+            _code.Escape(enumType),
+            _code.Escape(_typeMapper.UnderlyingClrType(enumType)));
+        }
+    
+    public void WriteFunctionParameters(EdmFunction edmFunction, Action<string, string, string, string> writeParameter)
+    {
+        var parameters = FunctionImportParameter.Create(edmFunction.Parameters, _code, _ef);
+        foreach (var parameter in parameters.Where(p => p.NeedsLocalVariable))
+        {
+            var isNotNull = parameter.IsNullableOfT ? parameter.FunctionParameterName + ".HasValue" : parameter.FunctionParameterName + " != null";
+            var notNullInit = "new ObjectParameter(\"" + parameter.EsqlParameterName + "\", " + parameter.FunctionParameterName + ")";
+            var nullInit = "new ObjectParameter(\"" + parameter.EsqlParameterName + "\", typeof(" + TypeMapper.FixNamespaces(parameter.RawClrTypeName) + "))";
+            writeParameter(parameter.LocalVariableName, isNotNull, notNullInit, nullInit);
+        }
+    }
+    
+    public string ComposableFunctionMethod(EdmFunction edmFunction, string modelNamespace)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} IQueryable<{1}> {2}({3})",
+            AccessibilityAndVirtual(Accessibility.ForMethod(edmFunction)),
+            _typeMapper.GetTypeName(_typeMapper.GetReturnType(edmFunction), modelNamespace),
+            _code.Escape(edmFunction),
+            string.Join(", ", parameters.Select(p => TypeMapper.FixNamespaces(p.FunctionParameterType) + " " + p.FunctionParameterName).ToArray()));
+    }
+    
+    public string ComposableCreateQuery(EdmFunction edmFunction, string modelNamespace)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "return ((IObjectContextAdapter)this).ObjectContext.CreateQuery<{0}>(\"[{1}].[{2}]({3})\"{4});",
+            _typeMapper.GetTypeName(_typeMapper.GetReturnType(edmFunction), modelNamespace),
+            edmFunction.NamespaceName,
+            edmFunction.Name,
+            string.Join(", ", parameters.Select(p => "@" + p.EsqlParameterName).ToArray()),
+            _code.StringBefore(", ", string.Join(", ", parameters.Select(p => p.ExecuteParameterName).ToArray())));
+    }
+    
+    public string FunctionMethod(EdmFunction edmFunction, string modelNamespace, bool includeMergeOption)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        var returnType = _typeMapper.GetReturnType(edmFunction);
+
+        var paramList = String.Join(", ", parameters.Select(p => TypeMapper.FixNamespaces(p.FunctionParameterType) + " " + p.FunctionParameterName).ToArray());
+        if (includeMergeOption)
+        {
+            paramList = _code.StringAfter(paramList, ", ") + "MergeOption mergeOption";
+        }
+
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} {1} {2}({3})",
+            AccessibilityAndVirtual(Accessibility.ForMethod(edmFunction)),
+            returnType == null ? "int" : "ObjectResult<" + _typeMapper.GetTypeName(returnType, modelNamespace) + ">",
+            _code.Escape(edmFunction),
+            paramList);
+    }
+    
+    public string ExecuteFunction(EdmFunction edmFunction, string modelNamespace, bool includeMergeOption)
+    {
+        var parameters = _typeMapper.GetParameters(edmFunction);
+        var returnType = _typeMapper.GetReturnType(edmFunction);
+
+        var callParams = _code.StringBefore(", ", String.Join(", ", parameters.Select(p => p.ExecuteParameterName).ToArray()));
+        if (includeMergeOption)
+        {
+            callParams = ", mergeOption" + callParams;
+        }
+        
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction{0}(\"{1}\"{2});",
+            returnType == null ? "" : "<" + _typeMapper.GetTypeName(returnType, modelNamespace) + ">",
+            edmFunction.Name,
+            callParams);
+    }
+    
+    public string DbSet(EntitySet entitySet)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} virtual DbSet<{1}> {2} {{ get; set; }}",
+            Accessibility.ForReadOnlyProperty(entitySet),
+            _typeMapper.GetTypeName(entitySet.ElementType),
+            _code.Escape(entitySet));
+    }
+
+    public string UsingDirectives(bool inHeader, bool includeCollections = true)
+    {
+        return inHeader == string.IsNullOrEmpty(_code.VsNamespaceSuggestion())
+            ? string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}using System;{1}" +
+                "{2}",
+                inHeader ? Environment.NewLine : "",
+                includeCollections ? (Environment.NewLine + "using System.Collections.Generic;") : "",
+                inHeader ? "" : Environment.NewLine)
+            : "";
+    }
+}
+
+public class TypeMapper
+{
+    private const string ExternalTypeNameAttributeName = @"http://schemas.microsoft.com/ado/2006/04/codegeneration:ExternalTypeName";
+
+    private readonly System.Collections.IList _errors;
+    private readonly CodeGenerationTools _code;
+    private readonly MetadataTools _ef;
+
+    public TypeMapper(CodeGenerationTools code, MetadataTools ef, System.Collections.IList errors)
+    {
+        ArgumentNotNull(code, "code");
+        ArgumentNotNull(ef, "ef");
+        ArgumentNotNull(errors, "errors");
+
+        _code = code;
+        _ef = ef;
+        _errors = errors;
+    }
+
+    public static string FixNamespaces(string typeName)
+    {
+        return typeName.Replace("System.Data.Spatial.", "System.Data.Entity.Spatial.");
+    }
+
+    public string GetTypeName(TypeUsage typeUsage)
+    {
+        return typeUsage == null ? null : GetTypeName(typeUsage.EdmType, _ef.IsNullable(typeUsage), modelNamespace: null);
+    }
+
+    public string GetTypeName(EdmType edmType)
+    {
+        return GetTypeName(edmType, isNullable: null, modelNamespace: null);
+    }
+
+    public string GetTypeName(TypeUsage typeUsage, string modelNamespace)
+    {
+        return typeUsage == null ? null : GetTypeName(typeUsage.EdmType, _ef.IsNullable(typeUsage), modelNamespace);
+    }
+
+    public string GetTypeName(EdmType edmType, string modelNamespace)
+    {
+        return GetTypeName(edmType, isNullable: null, modelNamespace: modelNamespace);
+    }
+
+    public string GetTypeName(EdmType edmType, bool? isNullable, string modelNamespace)
+    {
+        if (edmType == null)
+        {
+            return null;
+        }
+
+        var collectionType = edmType as CollectionType;
+        if (collectionType != null)
+        {
+            return String.Format(CultureInfo.InvariantCulture, "ICollection<{0}>", GetTypeName(collectionType.TypeUsage, modelNamespace));
+        }
+
+        var typeName = _code.Escape(edmType.MetadataProperties
+                                .Where(p => p.Name == ExternalTypeNameAttributeName)
+                                .Select(p => (string)p.Value)
+                                .FirstOrDefault())
+            ?? (modelNamespace != null && edmType.NamespaceName != modelNamespace ?
+                _code.CreateFullName(_code.EscapeNamespace(edmType.NamespaceName), _code.Escape(edmType)) :
+                _code.Escape(edmType));
+
+        if (edmType is StructuralType)
+        {
+            return typeName;
+        }
+
+        if (edmType is SimpleType)
+        {
+            var clrType = UnderlyingClrType(edmType);
+            if (!IsEnumType(edmType))
+            {
+                typeName = _code.Escape(clrType);
+            }
+
+            typeName = FixNamespaces(typeName);
+
+            return clrType.IsValueType && isNullable == true ?
+                String.Format(CultureInfo.InvariantCulture, "Nullable<{0}>", typeName) :
+                typeName;
+        }
+
+        throw new ArgumentException("edmType");
+    }
+    
+    public Type UnderlyingClrType(EdmType edmType)
+    {
+        ArgumentNotNull(edmType, "edmType");
+
+        var primitiveType = edmType as PrimitiveType;
+        if (primitiveType != null)
+        {
+            return primitiveType.ClrEquivalentType;
+        }
+
+        if (IsEnumType(edmType))
+        {
+            return GetEnumUnderlyingType(edmType).ClrEquivalentType;
+        }
+
+        return typeof(object);
+    }
+    
+    public object GetEnumMemberValue(MetadataItem enumMember)
+    {
+        ArgumentNotNull(enumMember, "enumMember");
+        
+        var valueProperty = enumMember.GetType().GetProperty("Value");
+        return valueProperty == null ? null : valueProperty.GetValue(enumMember, null);
+    }
+    
+    public string GetEnumMemberName(MetadataItem enumMember)
+    {
+        ArgumentNotNull(enumMember, "enumMember");
+        
+        var nameProperty = enumMember.GetType().GetProperty("Name");
+        return nameProperty == null ? null : (string)nameProperty.GetValue(enumMember, null);
+    }
+
+    public System.Collections.IEnumerable GetEnumMembers(EdmType enumType)
+    {
+        ArgumentNotNull(enumType, "enumType");
+
+        var membersProperty = enumType.GetType().GetProperty("Members");
+        return membersProperty != null 
+            ? (System.Collections.IEnumerable)membersProperty.GetValue(enumType, null)
+            : Enumerable.Empty<MetadataItem>();
+    }
+    
+    public bool EnumIsFlags(EdmType enumType)
+    {
+        ArgumentNotNull(enumType, "enumType");
+        
+        var isFlagsProperty = enumType.GetType().GetProperty("IsFlags");
+        return isFlagsProperty != null && (bool)isFlagsProperty.GetValue(enumType, null);
+    }
+
+    public bool IsEnumType(GlobalItem edmType)
+    {
+        ArgumentNotNull(edmType, "edmType");
+
+        return edmType.GetType().Name == "EnumType";
+    }
+
+    public PrimitiveType GetEnumUnderlyingType(EdmType enumType)
+    {
+        ArgumentNotNull(enumType, "enumType");
+
+        return (PrimitiveType)enumType.GetType().GetProperty("UnderlyingType").GetValue(enumType, null);
+    }
+
+    public string CreateLiteral(object value)
+    {
+        if (value == null || value.GetType() != typeof(TimeSpan))
+        {
+            return _code.CreateLiteral(value);
+        }
+
+        return string.Format(CultureInfo.InvariantCulture, "new TimeSpan({0})", ((TimeSpan)value).Ticks);
+    }
+    
+    public bool VerifyCaseInsensitiveTypeUniqueness(IEnumerable<string> types, string sourceFile)
+    {
+        ArgumentNotNull(types, "types");
+        ArgumentNotNull(sourceFile, "sourceFile");
+        
+        var hash = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+        if (types.Any(item => !hash.Add(item)))
+        {
+            _errors.Add(
+                new CompilerError(sourceFile, -1, -1, "6023",
+                    String.Format(CultureInfo.CurrentCulture, CodeGenerationTools.GetResourceString("Template_CaseInsensitiveTypeConflict"))));
+            return false;
+        }
+        return true;
+    }
+    
+    public IEnumerable<SimpleType> GetEnumItemsToGenerate(IEnumerable<GlobalItem> itemCollection)
+    {
+        return GetItemsToGenerate<SimpleType>(itemCollection)
+            .Where(e => IsEnumType(e));
+    }
+    
+    public IEnumerable<T> GetItemsToGenerate<T>(IEnumerable<GlobalItem> itemCollection) where T: EdmType
+    {
+        return itemCollection
+            .OfType<T>()
+            .Where(i => !i.MetadataProperties.Any(p => p.Name == ExternalTypeNameAttributeName))
+            .OrderBy(i => i.Name);
+    }
+
+    public IEnumerable<string> GetAllGlobalItems(IEnumerable<GlobalItem> itemCollection)
+    {
+        return itemCollection
+            .Where(i => i is EntityType || i is ComplexType || i is EntityContainer || IsEnumType(i))
+            .Select(g => GetGlobalItemName(g));
+    }
+
+    public string GetGlobalItemName(GlobalItem item)
+    {
+        if (item is EdmType)
+        {
+            return ((EdmType)item).Name;
+        }
+        else
+        {
+            return ((EntityContainer)item).Name;
+        }
+    }
+
+    public IEnumerable<EdmProperty> GetSimpleProperties(EntityType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type);
+    }
+    
+    public IEnumerable<EdmProperty> GetSimpleProperties(ComplexType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type);
+    }
+    
+    public IEnumerable<EdmProperty> GetComplexProperties(EntityType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is ComplexType && p.DeclaringType == type);
+    }
+    
+    public IEnumerable<EdmProperty> GetComplexProperties(ComplexType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is ComplexType && p.DeclaringType == type);
+    }
+
+    public IEnumerable<EdmProperty> GetPropertiesWithDefaultValues(EntityType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type && p.DefaultValue != null);
+    }
+    
+    public IEnumerable<EdmProperty> GetPropertiesWithDefaultValues(ComplexType type)
+    {
+        return type.Properties.Where(p => p.TypeUsage.EdmType is SimpleType && p.DeclaringType == type && p.DefaultValue != null);
+    }
+
+    public IEnumerable<NavigationProperty> GetNavigationProperties(EntityType type)
+    {
+        return type.NavigationProperties.Where(np => np.DeclaringType == type);
+    }
+    
+    public IEnumerable<NavigationProperty> GetCollectionNavigationProperties(EntityType type)
+    {
+        return type.NavigationProperties.Where(np => np.DeclaringType == type && np.ToEndMember.RelationshipMultiplicity == RelationshipMultiplicity.Many);
+    }
+    
+    public FunctionParameter GetReturnParameter(EdmFunction edmFunction)
+    {
+        ArgumentNotNull(edmFunction, "edmFunction");
+
+        var returnParamsProperty = edmFunction.GetType().GetProperty("ReturnParameters");
+        return returnParamsProperty == null
+            ? edmFunction.ReturnParameter
+            : ((IEnumerable<FunctionParameter>)returnParamsProperty.GetValue(edmFunction, null)).FirstOrDefault();
+    }
+
+    public bool IsComposable(EdmFunction edmFunction)
+    {
+        ArgumentNotNull(edmFunction, "edmFunction");
+
+        var isComposableProperty = edmFunction.GetType().GetProperty("IsComposableAttribute");
+        return isComposableProperty != null && (bool)isComposableProperty.GetValue(edmFunction, null);
+    }
+
+    public IEnumerable<FunctionImportParameter> GetParameters(EdmFunction edmFunction)
+    {
+        return FunctionImportParameter.Create(edmFunction.Parameters, _code, _ef);
+    }
+
+    public TypeUsage GetReturnType(EdmFunction edmFunction)
+    {
+        var returnParam = GetReturnParameter(edmFunction);
+        return returnParam == null ? null : _ef.GetElementType(returnParam.TypeUsage);
+    }
+    
+    public bool GenerateMergeOptionFunction(EdmFunction edmFunction, bool includeMergeOption)
+    {
+        var returnType = GetReturnType(edmFunction);
+        return !includeMergeOption && returnType != null && returnType.EdmType.BuiltInTypeKind == BuiltInTypeKind.EntityType;
+    }
+}
+
+public static void ArgumentNotNull<T>(T arg, string name) where T : class
+{
+    if (arg == null)
+    {
+        throw new ArgumentNullException(name);
+    }
+}
+#>
+File: WordsViewModel.cs
+
+
+using Dictionary.Data.Model;
+using Dictionary.Data.Repository;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Dictionary.Windows.ViewModel
+{
+    class WordsViewModel
+    {
+        ObservableCollection<WordRus> originalCollection;
+        public ObservableCollection<WordRus> Words
+        {
+            get
+            {
+                var result = new ObservableCollection<WordRus>();
+                foreach (var word in originalCollection)
+                {
+                    if (currLangId == 1)
+                        word.CurrWordText = word.Text;
+                    else
+                    {
+                        var tmp = word.Translations.Where(x => x.LanguageId == currLangId).FirstOrDefault();
+                        word.CurrWordText = tmp?.Text;
+                    }
+
+                    if (!string.IsNullOrEmpty(word.CurrWordText))
+                        result.Add(word);
+                }
+
+                return result;
+            }
+        }
+        WordsDB db;
+
+        public WordsViewModel(WordsDB db)
+        {
+            this.db = db;
+            LoadWords();
+        }
+
+        void LoadWords()
+        {
+            originalCollection = new ObservableCollection<WordRus>();
+
+            var result = new List<WordRus>();
+            result.AddRange(db.RusWords.GetAllWithTranslations());
+            foreach (var r in result)
+                originalCollection.Add(r);
+        }
+
+        public void UpdateWords()
+        {
+            LoadWords();
+        }
+
+        int currLangId;
+        public void Filter(int langId)
+        {
+            currLangId = langId;
+        }
+    }
+}
+
+File: WordTranslation.cs
+
+
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was generated from a template.
+//
+//     Manual changes to this file may cause unexpected behavior in your application.
+//     Manual changes to this file will be overwritten if the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+namespace Dictionary.Data.Model
+{
+    using System;
+    using System.Collections.Generic;
+    
+    public partial class WordTranslation
+    {
+        public int Id { get; set; }
+        public int WordId { get; set; }
+        public string Text { get; set; }
+        public int LanguageId { get; set; }
+    
+        public virtual WordRus WordRus { get; set; }
+        public virtual Language Language { get; set; }
+    }
+}
+
+File: WordTranslationMetadata.cs
+
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+
+namespace Dictionary.Data.Model
+{
+    [MetadataType(typeof(WordTranslationMetadata))]
+    public partial class WordTranslation : BaseDataModel
+    {
+        
+    }
+
+    internal sealed class WordTranslationMetadata
+    {
+        [Display(Name = "Перевод")]
+        public string Text { get; set; }
+    }
+}
+
+File: WordTranslation_Repository.cs
+
+
+using Dictionary.Data.Model;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Data.Entity;
+
+namespace Dictionary.Data.Repository
+{
+    class WordTranslation_Repository : Repository<WordTranslation>
+    {
+        public WordTranslation_Repository(WordsContext dbContext) : base(dbContext)
+        {
+        }
+    }
+}
+

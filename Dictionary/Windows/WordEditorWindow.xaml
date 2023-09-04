@@ -1,0 +1,72 @@
+﻿<Window x:Class="Dictionary.Windows.WordEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Dictionary.Windows"
+        xmlns:windows="clr-namespace:Dictionary.Windows"
+        mc:Ignorable="d"
+        Title="Добавить слово" Height="400" Width="600" WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.22*"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <Label Content="На русском*:" Margin="5"/>
+        <Label Content="На английском:" Margin="5" Grid.Row="1"/>
+        <Label Content="На испанском:" Margin="5" Grid.Row="2"/>
+
+        <TextBox Margin="5" Grid.Column="1"
+                 Text="{Binding Text, UpdateSourceTrigger=PropertyChanged, NotifyOnValidationError=True, ValidatesOnDataErrors=True}"/>
+        <TextBox Margin="5" Grid.Row="1" Grid.Column="1" 
+                 Text="{Binding Eng, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBox Margin="5" Grid.Row="2" Grid.Column="1"
+                 Text="{Binding Esp, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <Label Content="Смежные слова:" Margin="5 5 5 0" Grid.Row="3" Grid.ColumnSpan="2"/>
+        <Button Content="Добавить" Grid.Row="3" Grid.ColumnSpan="2"
+                HorizontalAlignment="Right" Margin="5"
+                Click="btn_addRelatedWord_Click"/>
+        <ListBox Grid.Row="4" Grid.ColumnSpan="2" Margin="5 0 5 5"
+                 ItemsSource="{Binding RelatedWords}" x:Name="lb_relatedWords"
+                 MouseDoubleClick="lb_relatedWords_MouseDoubleClick"
+                 KeyUp="lb_relatedWords_KeyUp">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="ListBoxItem">
+                    <TextBlock x:Name="label" Text="{Binding WordRus.Text}"/>
+                    <DataTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="TextDecorations" Value="Underline" TargetName="label"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                        </Trigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Удалить из смежных" Click="btn_deleteRelated_Click" InputGestureText="Delete"/>
+                    <MenuItem Header="Открыть карточку" Click="btn_openCard_Click"/>
+                </ContextMenu>
+            </ListBox.ContextMenu>
+        </ListBox>
+
+        <StackPanel Grid.Row="5" Grid.Column="1" HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Content="Добавить" x:Name="btn_ok" Width="70"
+                    Margin="5" Click="btn_ok_Click"/>
+            <Button Content="Отмена" x:Name="btn_cansel" Width="70" 
+                    Margin="5" Click="btn_cansel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

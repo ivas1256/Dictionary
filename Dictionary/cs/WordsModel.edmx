@@ -1,0 +1,344 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+  <!-- EF Runtime content -->
+  <edmx:Runtime>
+    <!-- SSDL content -->
+    <edmx:StorageModels>
+    <Schema Namespace="dataModel.Store" Provider="System.Data.SQLite.EF6" ProviderManifestToken="data source=&quot;D:\Work Projects\Dictionary\Dictionary\bin\Debug\data.db&quot;" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
+        <EntityType Name="language">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="name" Type="varchar" MaxLength="2147483647" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_related">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="word_rus_id" Type="integer" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_rus">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="text" Type="varchar" MaxLength="2147483647" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_rus_to_related">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="word_rus_id" Type="integer" Nullable="false" />
+          <Property Name="related_word_id" Type="integer" Nullable="false" />
+        </EntityType>
+        <EntityType Name="word_translation">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="integer" Nullable="false" StoreGeneratedPattern="Identity" />
+          <Property Name="word_id" Type="integer" Nullable="false" />
+          <Property Name="text" Type="varchar" MaxLength="2147483647" />
+          <Property Name="language_id" Type="integer" Nullable="false" />
+        </EntityType>
+        <Association Name="FK_word_related_0_0">
+          <End Role="word_rus" Type="Self.word_rus" Multiplicity="1" />
+          <End Role="word_related" Type="Self.word_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_related">
+              <PropertyRef Name="word_rus_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_0_0">
+          <End Role="word_related" Type="Self.word_related" Multiplicity="1" />
+          <End Role="word_rus_to_related" Type="Self.word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_related">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="related_word_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_1_0">
+          <End Role="word_rus" Type="Self.word_rus" Multiplicity="1" />
+          <End Role="word_rus_to_related" Type="Self.word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="word_rus_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_translation_0_0">
+          <End Role="language" Type="Self.language" Multiplicity="1" />
+          <End Role="word_translation" Type="Self.word_translation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="language">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="language_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_translation_1_0">
+          <End Role="word_rus" Type="Self.word_rus" Multiplicity="1" />
+          <End Role="word_translation" Type="Self.word_translation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="word_id" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityContainer Name="dataModelStoreContainer">
+          <EntitySet Name="language" EntityType="Self.language" store:Type="Tables" />
+          <EntitySet Name="word_related" EntityType="Self.word_related" store:Type="Tables" />
+          <EntitySet Name="word_rus" EntityType="Self.word_rus" store:Type="Tables" />
+          <EntitySet Name="word_rus_to_related" EntityType="Self.word_rus_to_related" store:Type="Tables" />
+          <EntitySet Name="word_translation" EntityType="Self.word_translation" store:Type="Tables" />
+          <AssociationSet Name="FK_word_related_0_0" Association="Self.FK_word_related_0_0">
+            <End Role="word_rus" EntitySet="word_rus" />
+            <End Role="word_related" EntitySet="word_related" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_0_0" Association="Self.FK_word_rus_to_related_0_0">
+            <End Role="word_related" EntitySet="word_related" />
+            <End Role="word_rus_to_related" EntitySet="word_rus_to_related" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_1_0" Association="Self.FK_word_rus_to_related_1_0">
+            <End Role="word_rus" EntitySet="word_rus" />
+            <End Role="word_rus_to_related" EntitySet="word_rus_to_related" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_translation_0_0" Association="Self.FK_word_translation_0_0">
+            <End Role="language" EntitySet="language" />
+            <End Role="word_translation" EntitySet="word_translation" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_translation_1_0" Association="Self.FK_word_translation_1_0">
+            <End Role="word_rus" EntitySet="word_rus" />
+            <End Role="word_translation" EntitySet="word_translation" />
+          </AssociationSet>
+        </EntityContainer>
+      </Schema></edmx:StorageModels>
+    <!-- CSDL content -->
+    <edmx:ConceptualModels>
+      <Schema Namespace="dataModel" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+        <EntityType Name="Language">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Name" Type="String" MaxLength="2147483647" FixedLength="false" Unicode="false" Nullable="false" />
+          <NavigationProperty Name="WordTranslations" Relationship="dataModel.FK_word_translation_0_01" FromRole="language" ToRole="word_translation" />
+        </EntityType>
+        <EntityType Name="WordRus">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Text" Type="String" MaxLength="2147483647" FixedLength="false" Unicode="false" Nullable="false" />
+          <NavigationProperty Name="Translations" Relationship="Self.FK_word_translation_0_0" FromRole="word_rus" ToRole="word_translation" />
+          <NavigationProperty Name="RelatedWordNodes" Relationship="dataModel.FK_word_related_0_0" FromRole="WordRus" ToRole="word_related" />
+          <NavigationProperty Name="WordRusToRelated" Relationship="dataModel.FK_word_rus_to_related_1_0" FromRole="WordRus" ToRole="word_rus_to_related" />
+        </EntityType>
+        <EntityType Name="WordTranslation">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="WordId" Type="Int32" Nullable="false" />
+          <Property Name="Text" Type="String" MaxLength="2147483647" FixedLength="false" Unicode="false" Nullable="true" />
+          <Property Name="LanguageId" Type="Int32" Nullable="false" />
+          <NavigationProperty Name="WordRus" Relationship="Self.FK_word_translation_0_0" FromRole="word_translation" ToRole="word_rus" />
+          <NavigationProperty Name="Language" Relationship="dataModel.FK_word_translation_0_01" FromRole="word_translation" ToRole="language" />
+        </EntityType>
+        <Association Name="FK_word_translation_0_0">
+          <End Role="word_rus" Type="dataModel.WordRus" Multiplicity="1" />
+          <End Role="word_translation" Type="dataModel.WordTranslation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_rus">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="WordId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityContainer Name="WordsContext" annotation:LazyLoadingEnabled="false">
+          <EntitySet Name="Language" EntityType="dataModel.Language" />
+          <EntitySet Name="WordRus" EntityType="dataModel.WordRus" />
+          <EntitySet Name="WordTranslation" EntityType="dataModel.WordTranslation" />
+          <AssociationSet Name="FK_word_translation_0_0" Association="Self.FK_word_translation_0_0">
+            <End Role="word_rus" EntitySet="WordRus" />
+            <End Role="word_translation" EntitySet="WordTranslation" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_translation_0_01" Association="dataModel.FK_word_translation_0_01">
+            <End Role="language" EntitySet="Language" />
+            <End Role="word_translation" EntitySet="WordTranslation" />
+          </AssociationSet>
+          <EntitySet Name="WordRelated" EntityType="dataModel.WordRelated" />
+          <EntitySet Name="WordRusToRelated" EntityType="dataModel.WordRusToRelated" />
+          <AssociationSet Name="FK_word_related_0_0" Association="dataModel.FK_word_related_0_0">
+            <End Role="WordRus" EntitySet="WordRus" />
+            <End Role="word_related" EntitySet="WordRelated" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_0_0" Association="dataModel.FK_word_rus_to_related_0_0">
+            <End Role="word_related" EntitySet="WordRelated" />
+            <End Role="word_rus_to_related" EntitySet="WordRusToRelated" />
+          </AssociationSet>
+          <AssociationSet Name="FK_word_rus_to_related_1_0" Association="dataModel.FK_word_rus_to_related_1_0">
+            <End Role="WordRus" EntitySet="WordRus" />
+            <End Role="word_rus_to_related" EntitySet="WordRusToRelated" />
+          </AssociationSet>
+        </EntityContainer>
+        <Association Name="FK_word_translation_0_01">
+          <End Type="dataModel.Language" Role="language" Multiplicity="1" />
+          <End Type="dataModel.WordTranslation" Role="word_translation" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="language">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_translation">
+              <PropertyRef Name="LanguageId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityType Name="WordRelated">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="WordRusId" Type="Int32" Nullable="false" />
+          <NavigationProperty Name="WordRus" Relationship="dataModel.FK_word_related_0_0" FromRole="word_related" ToRole="WordRus" />
+          <NavigationProperty Name="WordRusToRelated" Relationship="dataModel.FK_word_rus_to_related_0_0" FromRole="word_related" ToRole="word_rus_to_related" />
+        </EntityType>
+        <EntityType Name="WordRusToRelated">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="WordRusId" Type="Int32" Nullable="false" />
+          <Property Name="RelatedWordId" Type="Int32" Nullable="false" />
+          <NavigationProperty Name="RelatedWord" Relationship="dataModel.FK_word_rus_to_related_0_0" FromRole="word_rus_to_related" ToRole="word_related" />
+          <NavigationProperty Name="WordRus" Relationship="dataModel.FK_word_rus_to_related_1_0" FromRole="word_rus_to_related" ToRole="WordRus" />
+        </EntityType>
+        <Association Name="FK_word_related_0_0">
+          <End Type="dataModel.WordRus" Role="WordRus" Multiplicity="1" />
+          <End Type="dataModel.WordRelated" Role="word_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="WordRus">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_related">
+              <PropertyRef Name="WordRusId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_0_0">
+          <End Type="dataModel.WordRelated" Role="word_related" Multiplicity="1" />
+          <End Type="dataModel.WordRusToRelated" Role="word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="word_related">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="RelatedWordId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK_word_rus_to_related_1_0">
+          <End Type="dataModel.WordRus" Role="WordRus" Multiplicity="1" />
+          <End Type="dataModel.WordRusToRelated" Role="word_rus_to_related" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="WordRus">
+              <PropertyRef Name="Id" />
+            </Principal>
+            <Dependent Role="word_rus_to_related">
+              <PropertyRef Name="WordRusId" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+      </Schema>
+    </edmx:ConceptualModels>
+    <!-- C-S mapping content -->
+    <edmx:Mappings>
+      <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
+        <EntityContainerMapping StorageEntityContainer="dataModelStoreContainer" CdmEntityContainer="WordsContext">
+          <EntitySetMapping Name="Language">
+            <EntityTypeMapping TypeName="dataModel.Language">
+              <MappingFragment StoreEntitySet="language">
+                <ScalarProperty Name="Id" ColumnName="id" />
+                <ScalarProperty Name="Name" ColumnName="name" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordRus">
+            <EntityTypeMapping TypeName="dataModel.WordRus">
+              <MappingFragment StoreEntitySet="word_rus">
+                <ScalarProperty Name="Id" ColumnName="id" />
+                <ScalarProperty Name="Text" ColumnName="text" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordTranslation">
+            <EntityTypeMapping TypeName="dataModel.WordTranslation">
+              <MappingFragment StoreEntitySet="word_translation">
+                <ScalarProperty Name="Id" ColumnName="id" />
+                <ScalarProperty Name="WordId" ColumnName="word_id" />
+                <ScalarProperty Name="Text" ColumnName="text" />
+                <ScalarProperty Name="LanguageId" ColumnName="language_id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordRelated">
+            <EntityTypeMapping TypeName="dataModel.WordRelated">
+              <MappingFragment StoreEntitySet="word_related">
+                <ScalarProperty Name="WordRusId" ColumnName="word_rus_id" />
+                <ScalarProperty Name="Id" ColumnName="id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="WordRusToRelated">
+            <EntityTypeMapping TypeName="dataModel.WordRusToRelated">
+              <MappingFragment StoreEntitySet="word_rus_to_related">
+                <ScalarProperty Name="RelatedWordId" ColumnName="related_word_id" />
+                <ScalarProperty Name="WordRusId" ColumnName="word_rus_id" />
+                <ScalarProperty Name="Id" ColumnName="id" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+        </EntityContainerMapping>
+      </Mapping>
+    </edmx:Mappings>
+  </edmx:Runtime>
+  <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <Connection>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="MetadataArtifactProcessing" Value="EmbedInOutputAssembly" />
+      </DesignerInfoPropertySet>
+    </Connection>
+    <Options>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="ValidateOnBuild" Value="true" />
+        <DesignerProperty Name="EnablePluralization" Value="false" />
+        <DesignerProperty Name="IncludeForeignKeysInModel" Value="true" />
+        <DesignerProperty Name="UseLegacyProvider" Value="false" />
+        <DesignerProperty Name="CodeGenerationStrategy" Value="None" />
+      </DesignerInfoPropertySet>
+    </Options>
+    <!-- Diagram content (shape and connector positions) -->
+    <Diagrams></Diagrams>
+  </Designer>
+</edmx:Edmx>
